@@ -127,6 +127,21 @@ function hasMigrationCompleted(uid){return localStorage.getItem(migrationMarkerK
 function getMigrationBackup(uid){
   try{const raw=localStorage.getItem(migrationBackupKey(uid));if(!raw)return null;const parsed=JSON.parse(raw);return parsed?.state||null;}catch(e){console.warn(e);return null;}
 }
+function findAnyMigrationBackup(){
+  try{
+    const prefix=KEY+"-migration-backup-";
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith(prefix)){
+        const raw=localStorage.getItem(k);
+        if(!raw)continue;
+        const parsed=JSON.parse(raw);
+        if(parsed?.state)return {key:k,state:parsed.state,savedAt:parsed.savedAt||null};
+      }
+    }
+  }catch(e){console.warn(e);}
+  return null;
+}
 function hasMigrationBackup(uid){return !!getMigrationBackup(uid);}
 function hasCustomDataInSnapshot(snapshot){
   if(!snapshot)return false;
@@ -138,6 +153,7 @@ function hasCustomDataInSnapshot(snapshot){
   return (snapshot.items||[]).length!==BASE_ITEMS.length||extraStores||extraCats||extraItems||changedItems||Object.keys(snapshot.lastRoutesByStore||{}).length>0||Object.keys(snapshot.orderStatsByStore||{}).length>0;
 }
 function backupHasCustomData(uid){return hasCustomDataInSnapshot(getMigrationBackup(uid));}
+function anyBackupHasCustomData(){const found=findAnyMigrationBackup();return !!(found&&hasCustomDataInSnapshot(found.state));}
 function markMigrationCompleted(uid){localStorage.setItem(migrationMarkerKey(uid),new Date().toISOString());}
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function categoryList(){return state.categories.slice()}
@@ -249,14 +265,42 @@ function renderMaster(app){
   const groups={}; state.items.forEach(x=>(groups[x.category]??=[]).push(x));
   const ordered=categoryList().map(cat=>[cat,(groups[cat]||[]).sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}))]);
   const uid=currentUser?.id||"";
-  const migrationNotice = (!hasMigrationCompleted(uid) && (hasLocalCustomData() || backupHasCustomData(uid))) ? `<div class="notice"><b>Device data found.</b> Your previous Grocery Route data is available on this Mac. <button class="secondary" type="button" onclick="migrateNow()">Migrate this device</button></div>` : "";
+  const migrationNotice = ((!hasMigrationCompleted(uid) && (hasLocalCustomData() || backupHasCustomData(uid))) || anyBackupHasCustomData()) ? `<div class="notice"><b>Device data found.</b> Your previous Shop Path data is available on this Mac. <button class="secondary" type="button" onclick="migrateNow()">Migrate this device</button></div>` : "";
   app.innerHTML=`${migrationNotice}<div class="bar"><input id="search" placeholder="Search master list…"><button class="primary" onclick="openAdd()">Add Item</button></div><div class="bar"><button class="secondary" onclick="openStoreManager()">＋ Add Store</button><button class="secondary" onclick="addCategory()">＋ Add Category</button></div><p class="muted">Tap an item to include it in this week's shop. Tap the item name to set amount and store.</p>${ordered.map(([cat,arr])=>`<div class="section"><h2>${esc(cat)}</h2>${arr.length?arr.map(x=>`<div class="card item-card" data-name="${esc(x.name.toLowerCase())}"><div class="row"><button class="buy ${x.selected?"done":""}" onclick="toggleSelect('${esc(x.id)}')">${x.selected?"✓":"+"}</button><button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div><div class="storetag">Tap item to set quantity & store</div></button><button class="secondary" onclick="editItem('${esc(x.id)}')">Edit</button><button class="secondary" onclick="deleteItem('${esc(x.id)}')">Delete</button></div></div>`).join(""):`<div class="muted">No items in this category yet.</div>`}</div>`).join("")}`; document.getElementById("search").oninput=e=>filterCards(e.target.value);
+}
+async function clearRoute(){
+  if(!confirm("Clear all learned route history for every store? Your Master List and current weekly shop will not be changed."))return;
+  // Clear route-learning data locally while leaving Master List, stores, categories
+  // and the current weekly shopping selection untouched.
+  state.routesByStore={};
+  state.pairsByStore={};
+  state.orderStatsByStore={};
+  state.lastRoutesByStore={};
+  saveLocal();
+  render();
+  if(currentUser && cloudReady){
+    setSyncStatus("Clearing learned routes…");
+    try{
+      const uid=currentUser.id;
+      const [pairs,routes]=await Promise.all([
+        db.from("route_pairs").delete().eq("user_id",uid),
+        db.from("latest_store_routes").delete().eq("user_id",uid)
+      ]);
+      if(pairs.error)throw pairs.error;
+      if(routes.error)throw routes.error;
+      setSyncStatus("Synced");
+    }catch(err){
+      console.error("Clear learned routes error:",err);
+      setSyncStatus("Sync error");
+      alert("The local learned routes were cleared, but the cloud could not be updated. Please try again.");
+    }
+  }
 }
 function renderRoute(app){
   const storeSet=new Set(state.stores||[]);Object.keys(state.lastRoutesByStore||{}).forEach(st=>storeSet.add(st));Object.keys(state.routesByStore||{}).forEach(st=>storeSet.add(st));state.items.filter(x=>x.selected).forEach(x=>storeSet.add(x.shopStore||x.store||"PAK'nSAVE"));
   const stores=[...storeSet].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
   const sections=stores.map(store=>{const selected=sortedSelectedByStore(store),route=state.lastRoutesByStore[store]?.length?state.lastRoutesByStore[store]:(state.routesByStore[store]||[]),suggestion=selected.length?selected.map((x,i)=>`${i+1}. ${esc(x.name)}`).join("<br>"):"Select items in Master List for your next shop.";return `<div class="card"><b>${esc(store)}</b><p class="muted">Latest recorded trip</p><p>${route.length?route.map((id,i)=>`${i+1}. ${esc(state.items.find(x=>x.id===id)?.name||id)}`).join("<br>"):"No shopping trip recorded yet."}</p><p class="muted">Current suggested order</p><p>${suggestion}</p></div>`}).join("");
-  app.innerHTML=`<div class="card"><b>How route learning works</b><p class="muted">Grocery Route accumulates your actual shopping order separately for each store. Repeated ordering becomes stronger over time; the latest route is used only to break ties.</p></div>${sections}<button class="primary" onclick="clearRoute()">Clear learned routes</button>`;
+  app.innerHTML=`<div class="card"><b>How route learning works</b><p class="muted">Shop Path accumulates your actual shopping order separately for each store. Repeated ordering becomes stronger over time; the latest route is used only to break ties.</p></div>${sections}<button class="primary" onclick="clearRoute()">Clear learned routes</button>`;
 }
 
 function toggleSelect(id){const x=state.items.find(x=>x.id===id);if(!x)return;x.selected=!x.selected;x.bought=false;if(x.selected&&!x.shopStore)x.shopStore=x.store||"PAK'nSAVE";saveLocal();render();queueCloudSync()}
@@ -443,12 +487,30 @@ async function loadCloudOrMigrate(){
   const uid=currentUser.id;
   // A previous migration attempt may have backed up the device data before a later
   // step failed. Recover that backup before allowing the cloud copy to replace it.
-  if(!hasMigrationCompleted(uid) && backupHasCustomData(uid)){
-    const backup=getMigrationBackup(uid);
-    const ok=confirm('A protected backup of your previous device data was found. It contains custom Grocery Route data such as your Pet category, added items and/or route history. I will merge that backup with the cloud data without deleting either side. Continue?');
-    if(ok){await recoverMigrationBackup(remote);return;}
-    setSyncStatus('Migration available');
-    return;
+  if(!hasMigrationCompleted(uid)){
+    const sameUserBackup=getMigrationBackup(uid);
+    const anyBackup=findAnyMigrationBackup();
+    const backup=sameUserBackup || (anyBackup&&anyBackup.state);
+    if(backup&&hasCustomDataInSnapshot(backup)){
+      const ok=confirm('A protected backup of your previous device data was found. It contains custom Shop Path data such as your Pet category, added items and/or route history. I will merge that backup with the cloud data without deleting either side. Continue?');
+      if(ok){
+        if(sameUserBackup) await recoverMigrationBackup(remote);
+        else {
+          await downloadIntoLocal(remote);
+          mergeLocalIntoCurrent(backup);
+          await syncMasterData();
+          await replaceCloudRoutes();
+          await verifyCloudMatchesLocal();
+          markMigrationCompleted(uid);
+          saveLocal();
+          localDirty=false;
+          setSyncStatus('Migration complete');
+        }
+        return;
+      }
+      setSyncStatus('Migration available');
+      return;
+    }
   }
   if(hasMigrationCompleted(uid)){
     // A completed migration means the local device has already been merged into
@@ -461,7 +523,7 @@ async function loadCloudOrMigrate(){
   const localHasData=localHasAnythingBeyondFresh() || hasLocalCustomData();
   if(!remoteHasData(remote)){
     if(localHasData){
-      const doMigrate=confirm('Your existing Grocery Route data is on this device. A secure local backup will be created before it is copied to the cloud. Continue with migration?');
+      const doMigrate=confirm('Your existing Shop Path data is on this device. A secure local backup will be created before it is copied to the cloud. Continue with migration?');
       if(doMigrate){await seedRemoteFromLocal();return}
       throw new Error('Migration cancelled. Your local data has not been changed.');
     }
@@ -469,7 +531,7 @@ async function loadCloudOrMigrate(){
     return;
   }
   if(localHasData){
-    const doMerge=confirm('This device has existing Grocery Route data and your cloud account also has data. I will back up the device data first, then safely merge both sets of data without deleting either side. Continue?');
+    const doMerge=confirm('This device has existing Shop Path data and your cloud account also has data. I will back up the device data first, then safely merge both sets of data without deleting either side. Continue?');
     if(doMerge){await migrateOrMergeLocalData(remote);return}
     await downloadIntoLocal(remote);
     return;
@@ -604,12 +666,12 @@ async function syncMasterData(){
 async function syncToCloud(forceRoutes=false){if(!currentUser||!cloudReady||syncing)return;syncing=true;try{setSyncStatus("Syncing…");await syncMasterData();if(forceRoutes)await replaceCloudRoutes();localDirty=false;setSyncStatus("Synced")}catch(err){console.error(err);setSyncStatus("Sync error")}finally{syncing=false}}
 function queueCloudSync(forceRoutes=false){if(!currentUser||!cloudReady)return;clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(()=>syncToCloud(forceRoutes),400)}
 
-async function signIn(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(!email||!password){setAuthMsg("Enter your email and password.");return}setAuthMsg("Signing in…",false);const {error}=await db.auth.signInWithPassword({email,password});if(error){setAuthMsg(error.message);return}setAuthMsg("Sign-in successful. Loading your Grocery Route…",false)}
-async function signUp(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(!email||!password){setAuthMsg("Enter your email and password.");return}setAuthMsg("Creating account…",false);const {data,error}=await db.auth.signUp({email,password});if(error){setAuthMsg(error.message);return}if(data.session){setAuthMsg("Account created. Loading your Grocery Route…",false)}else setAuthMsg("Account created. Check your email to confirm your account, then sign in.",false)}
+async function signIn(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(!email||!password){setAuthMsg("Enter your email and password.");return}setAuthMsg("Signing in…",false);const {error}=await db.auth.signInWithPassword({email,password});if(error){setAuthMsg(error.message);return}setAuthMsg("Sign-in successful. Loading your Shop Path…",false)}
+async function signUp(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(!email||!password){setAuthMsg("Enter your email and password.");return}setAuthMsg("Creating account…",false);const {data,error}=await db.auth.signUp({email,password});if(error){setAuthMsg(error.message);return}if(data.session){setAuthMsg("Account created. Loading your Shop Path…",false)}else setAuthMsg("Account created. Check your email to confirm your account, then sign in.",false)}
 async function resetPassword(){const email=document.getElementById("authEmail").value.trim();if(!email){setAuthMsg("Enter your email address first.");return}const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});setAuthMsg(error?error.message:"If that email has an account, Supabase will send password-reset instructions.",!error)}
 async function bootAuthenticated(user){
   currentUser=user;loadLocal();document.getElementById("userEmail").textContent=user.email||"";authVisible(false);setAuthMsg("");setSyncStatus("Connecting…");
-  try{await loadCloudOrMigrate();cloudReady=true;render();}catch(err){console.error("Supabase boot error:",err);cloudReady=false;setSyncStatus("Cloud setup needed");render();const code=err?.code?` [${err.code}]`:"";const msg=err?.message||String(err);alert(`Grocery Route could not complete cloud setup.${code}\n\n${msg}`)}
+  try{await loadCloudOrMigrate();cloudReady=true;render();}catch(err){console.error("Supabase boot error:",err);cloudReady=false;setSyncStatus("Cloud setup needed");render();const code=err?.code?` [${err.code}]`:"";const msg=err?.message||String(err);alert(`Shop Path could not complete cloud setup.${code}\n\n${msg}`)}
 }
 async function signOut(){await db.auth.signOut();currentUser=null;cloudReady=false;authVisible(true);setAuthMsg("Signed out.",false)}
 
