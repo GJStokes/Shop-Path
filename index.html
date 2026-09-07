@@ -307,6 +307,18 @@ async function clearRoute(){
     setSyncStatus("Clearing learned routes…");
     try{
       const uid=currentUser.id;
+      // Route learning is derived from completed shopping trips. Remove those
+      // completed trip records too, otherwise a later rebuild could resurrect
+      // routes the user explicitly asked to clear. Leave any open/current trip alone.
+      const done=await db.from("shopping_trips").select("id").eq("user_id",uid).eq("status","completed");
+      if(done.error)throw done.error;
+      const completedIds=(done.data||[]).map(r=>r.id).filter(Boolean);
+      if(completedIds.length){
+        const di=await db.from("shopping_trip_items").delete().in("trip_id",completedIds).eq("user_id",uid);
+        if(di.error)throw di.error;
+        const dt=await db.from("shopping_trips").delete().in("id",completedIds).eq("user_id",uid);
+        if(dt.error)throw dt.error;
+      }
       const [pairs,routes]=await Promise.all([
         db.from("route_pairs").delete().eq("user_id",uid),
         db.from("latest_store_routes").delete().eq("user_id",uid)
@@ -638,10 +650,102 @@ async function syncCompletedTrip(completed){
   await replaceCloudRoutes();setSyncStatus("Synced");
 }
 async function replaceCloudRoutes(){
-  const uid=currentUser.id; const del=await db.from("route_pairs").delete().eq("user_id",uid);if(del.error)throw del.error;
-  const pairRows=[];for(const [store,stats] of Object.entries(state.orderStatsByStore||{}))for(const [key,count] of Object.entries(stats||{})){const [a,b]=key.split("|");pairRows.push({user_id:uid,store_name:store,item_a_name:a,item_b_name:b,observations:count,last_observed_at:new Date().toISOString()})}
-  if(pairRows.length){const ins=await db.from("route_pairs").insert(pairRows);if(ins.error)throw ins.error}
-  const d=await db.from("latest_store_routes").delete().eq("user_id",uid);if(d.error)throw d.error;const routeRows=Object.entries(state.lastRoutesByStore||{}).map(([store,route])=>({user_id:uid,store_name:store,route_items:route,completed_at:new Date().toISOString()}));if(routeRows.length){const ins=await db.from("latest_store_routes").insert(routeRows);if(ins.error)throw ins.error}
+  const uid=currentUser.id;
+
+  // The authoritative route history is the completed shopping trips in the
+  // cloud, not a single device's local route state. Rebuild the aggregate route
+  // tables from every completed trip so one device can never overwrite another
+  // device's learning history.
+  const tripsRes=await db.from("shopping_trips")
+    .select("id,completed_at,created_at")
+    .eq("user_id",uid)
+    .eq("status","completed")
+    .order("completed_at",{ascending:true});
+  if(tripsRes.error)throw tripsRes.error;
+  const tripRows=tripsRes.data||[];
+  const tripIds=tripRows.map(t=>t.id).filter(Boolean);
+
+  let itemRows=[];
+  if(tripIds.length){
+    const itemsRes=await db.from("shopping_trip_items")
+      .select("trip_id,item_name,store_name,route_position")
+      .eq("user_id",uid)
+      .in("trip_id",tripIds)
+      .not("route_position","is",null)
+      .order("route_position",{ascending:true});
+    if(itemsRes.error)throw itemsRes.error;
+    itemRows=itemsRes.data||[];
+  }
+
+  const tripMap=new Map(tripRows.map(t=>[t.id,t]));
+  const byTripStore=new Map();
+  for(const row of itemRows){
+    const store=(row.store_name||"PAK'nSAVE").trim()||"PAK'nSAVE";
+    const key=row.trip_id+"||"+store;
+    if(!byTripStore.has(key))byTripStore.set(key,[]);
+    byTripStore.get(key).push(row);
+  }
+
+  const aggregate={};
+  const latest={};
+  for(const [key,rows] of byTripStore.entries()){
+    rows.sort((a,b)=>Number(a.route_position)-Number(b.route_position));
+    const [tripId,store]=key.split("||");
+    const route=rows.map(r=>r.item_name).filter(Boolean);
+
+    aggregate[store]??={};
+    for(let i=0;i<route.length;i++){
+      for(let j=i+1;j<route.length;j++){
+        if(route[i]===route[j])continue;
+        const pair=route[i]+"|"+route[j];
+        aggregate[store][pair]=(aggregate[store][pair]||0)+1;
+      }
+    }
+
+    const trip=tripMap.get(tripId);
+    const tripTime=trip?.completed_at||trip?.created_at||new Date().toISOString();
+    if(!latest[store] || new Date(tripTime)>new Date(latest[store].completed_at)){
+      latest[store]={route,tripId,completed_at:tripTime};
+    }
+  }
+
+  const delPairs=await db.from("route_pairs").delete().eq("user_id",uid);
+  if(delPairs.error)throw delPairs.error;
+  const pairRows=[];
+  for(const [store,stats] of Object.entries(aggregate)){
+    for(const [key,count] of Object.entries(stats)){
+      const split=key.indexOf("|");
+      if(split<0)continue;
+      const a=key.slice(0,split),b=key.slice(split+1);
+      pairRows.push({user_id:uid,store_name:store,item_a_name:a,item_b_name:b,observations:count,last_observed_at:new Date().toISOString()});
+    }
+  }
+  if(pairRows.length){
+    const ins=await db.from("route_pairs").insert(pairRows);
+    if(ins.error)throw ins.error;
+  }
+
+  const delLatest=await db.from("latest_store_routes").delete().eq("user_id",uid);
+  if(delLatest.error)throw delLatest.error;
+  const latestRows=Object.entries(latest).map(([store,data])=>({
+    user_id:uid,
+    store_name:store,
+    trip_id:data.tripId,
+    route_items:data.route,
+    completed_at:data.completed_at
+  }));
+  if(latestRows.length){
+    const ins=await db.from("latest_store_routes").insert(latestRows);
+    if(ins.error)throw ins.error;
+  }
+
+  // Keep the current device's in-memory route learning aligned with the cloud
+  // aggregates after rebuilding from all completed trips.
+  state.orderStatsByStore={};
+  for(const [store,stats] of Object.entries(aggregate))state.orderStatsByStore[store]={...stats};
+  state.lastRoutesByStore={};
+  for(const [store,data] of Object.entries(latest))state.lastRoutesByStore[store]=[...data.route];
+  saveLocal();
 }
 async function syncMasterData(){
   const uid=currentUser.id;
