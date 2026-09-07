@@ -188,12 +188,12 @@ function recordBuy(id){
  route.push(id);
  it.bought=true;
  // When the whole weekly shop is finished, convert each store's completed
- // route into cumulative pairwise evidence. This is what makes the app learn
- // from repeated behaviour rather than simply copying the latest trip.
+ // route into cumulative pairwise evidence. This makes the app learn from
+ // repeated behaviour rather than simply copying the latest trip.
  const remaining=state.items.some(x=>x.selected&&!x.bought);
  if(!remaining){
    for(const [st,r] of Object.entries(state.routesByStore||{})){
-     if(!Array.isArray(r) || r.length<2)continue;
+     if(!Array.isArray(r) || !r.length)continue;
      if(!state.orderStatsByStore[st])state.orderStatsByStore[st]={};
      const stats=state.orderStatsByStore[st];
      for(let i=0;i<r.length;i++){
@@ -205,6 +205,19 @@ function recordBuy(id){
      }
      state.lastRoutesByStore[st]=[...r];
    }
+   // The weekly shop is finished. Clear the week's checkmarks automatically
+   // so the Master List is ready for the next selection. Route-learning
+   // history is preserved in orderStatsByStore and lastRoutesByStore.
+   state.items.forEach(x=>{
+     if(x.selected && x.bought){
+       x.selected=false;
+       x.bought=false;
+     }
+   });
+   // Reset only in-progress trip data; never erase learned history.
+   state.routesByStore={};
+   state.route=[];
+   state.shopStarted=null;
  }
  save();render();
 }
@@ -247,12 +260,17 @@ function renderMaster(app){
  document.getElementById("search").oninput=e=>filterCards(e.target.value);
 }
 function renderRoute(app){
- const stores=[...new Set(state.items.filter(x=>x.selected).map(x=>x.shopStore||x.store||"PAK'nSAVE"))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
+ const storeSet=new Set(state.stores||[]);
+ Object.keys(state.lastRoutesByStore||{}).forEach(st=>storeSet.add(st));
+ Object.keys(state.routesByStore||{}).forEach(st=>storeSet.add(st));
+ state.items.filter(x=>x.selected).forEach(x=>storeSet.add(x.shopStore||x.store||"PAK'nSAVE"));
+ const stores=[...storeSet].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
  const sections=stores.length?stores.map(store=>{
    const selected=sortedSelectedByStore(store);
    const route=(state.lastRoutesByStore[store]&&state.lastRoutesByStore[store].length) ? state.lastRoutesByStore[store] : (state.routesByStore[store]||[]);
-   return `<div class="card"><b>${esc(store)}</b><p class="muted">Latest recorded trip</p><p>${route.length?route.map((id,i)=>`${i+1}. ${esc(state.items.find(x=>x.id===id)?.name||id)}`).join("<br>"):"No shopping trip recorded yet."}</p><p class="muted">Current suggested order</p><p>${selected.length?selected.map((x,i)=>`${i+1}. ${esc(x.name)}`).join("<br>"):"No selected items for this store."}</p></div>`;
- }).join(""):`<div class="card"><p>Select items in Master List first.</p></div>`;
+   const suggestion=selected.length?selected.map((x,i)=>`${i+1}. ${esc(x.name)}`).join("<br>"):"Select items in Master List for your next shop.";
+   return `<div class="card"><b>${esc(store)}</b><p class="muted">Latest recorded trip</p><p>${route.length?route.map((id,i)=>`${i+1}. ${esc(state.items.find(x=>x.id===id)?.name||id)}`).join("<br>"):"No shopping trip recorded yet."}</p><p class="muted">Current suggested order</p><p>${suggestion}</p></div>`;
+ }).join(""):`<div class="card"><p>Add a store or select items in Master List to begin learning a route.</p></div>`;
  app.innerHTML=`<div class="card"><b>How route learning works</b><p class="muted">The app learns your shopping order separately for each store. Just tap ✓ as you shop. PAK'nSAVE, Woolworths and each specialty store can develop their own route without mixing them together.</p></div>${sections}<button class="primary" onclick="clearRoute()">Clear learned routes</button>`;
 }
 function filterCards(q){q=q.toLowerCase();document.querySelectorAll(".item-card").forEach(c=>c.style.display=c.dataset.name.includes(q)?"":"none")}
@@ -263,9 +281,21 @@ function setUnit(id,v){const x=state.items.find(x=>x.id===id);x.shopUnit=v;x.usu
 function setShopStore(id,v){const x=state.items.find(x=>x.id===id);if(!x)return;const store=ensureStore(v);x.shopStore=store;x.bought=false;save();render()}
 function buy(id){recordBuy(id)}
 function resetBought(){
-  // Start another shopping trip without deleting cumulative learning or the
-  // last fully completed route for each store.
-  state.items.forEach(x=>x.bought=false);
+  // Restore the most recently completed shop without deleting cumulative
+  // learning or the latest completed routes.
+  const restore=new Set(Object.values(state.lastRoutesByStore||{}).flat());
+  if(!restore.size){
+    alert("There is no completed shop to restore yet.");
+    return;
+  }
+  state.items.forEach(x=>{
+    if(restore.has(x.id)){
+      x.selected=true;
+      x.bought=false;
+    }else{
+      x.bought=false;
+    }
+  });
   state.routesByStore={};
   state.route=[];
   state.shopStarted=null;
