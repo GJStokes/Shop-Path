@@ -16,7 +16,7 @@ button{font:inherit}.primary{background:#111827;color:white;border:0;border-radi
 .buy{width:42px;height:42px;border-radius:12px;border:2px solid #9ca3af;background:white;font-size:20px}.buy.done{background:#111827;color:white;border-color:#111827}.qty{display:flex;align-items:center;gap:5px}.qty input{width:54px;text-align:center;padding:7px;border:1px solid #d1d5db;border-radius:8px}.qty select{padding:7px;border:1px solid #d1d5db;border-radius:8px;background:white}
 .section{margin-top:18px}.section h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}.storetag{font-size:12px;color:#374151;margin-top:3px;font-weight:600}.item-open{border:0;background:transparent;padding:0;text-align:left;cursor:pointer;flex:1}.item-open:active{opacity:.7}
 .muted{color:#6b7280;font-size:13px}.empty{padding:30px;text-align:center;color:#6b7280}.stats{display:flex;gap:8px;margin-bottom:10px}.stat{background:white;border-radius:12px;padding:10px;flex:1;text-align:center}.stat b{display:block;font-size:20px}
-.modal{position:fixed;inset:0;background:#0007;display:none;z-index:20;padding:18px}.modal.show{display:flex;align-items:flex-end}.sheet{background:white;border-radius:18px 18px 0 0;width:100%;max-height:85vh;overflow:auto;padding:16px}.sheet h2{margin-top:0}.sheet input,.sheet select{width:100%;padding:12px;margin:5px 0;border:1px solid #d1d5db;border-radius:10px;font-size:16px}.actions{display:flex;gap:8px;margin-top:10px}.actions button{flex:1}.store-list{margin:10px 0}.store-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #eee}.store-row span{flex:1;font-weight:600}.store-row button{padding:7px 10px}.store-add{display:flex;gap:8px;margin-top:12px}.store-add input{flex:1;margin:0}.store-add button{white-space:nowrap}
+.modal{position:fixed;inset:0;background:#0007;display:none;z-index:20;padding:18px}.modal.show{display:flex;align-items:flex-end}.sheet{background:white;border-radius:18px 18px 0 0;width:100%;max-height:85vh;overflow:auto;padding:16px}.sheet h2{margin-top:0}.sheet input,.sheet select{width:100%;padding:12px;margin:5px 0;border:1px solid #d1d5db;border-radius:10px;font-size:16px}.actions{display:flex;gap:8px;margin-top:10px}.actions button{flex:1}.store-list{margin:10px 0}.store-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #eee}.store-row span{flex:1;font-weight:600}.store-row button{padding:7px 10px}.store-add{display:flex;gap:8px;margin-top:12px}.store-add input{flex:1;margin:0}.store-add button{white-space:nowrap}.search-results{margin-top:18px}.search-results h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}
 #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:#f3f4f6}.auth-card{width:min(100%,430px);background:white;border-radius:20px;padding:24px;box-shadow:0 10px 35px #0002}.auth-card h2{margin:0 0 6px}.auth-card input{width:100%;padding:13px;border:1px solid #d1d5db;border-radius:10px;font-size:16px;margin:6px 0}.auth-actions{display:flex;gap:8px;margin-top:10px}.auth-actions button{flex:1}.auth-msg{min-height:24px;margin-top:10px;font-size:14px;color:#b00020}.auth-links{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap}.auth-links button{border:0;background:none;padding:0;color:#2563eb;cursor:pointer}#app-shell{display:none}#app-shell.authenticated{display:block}#auth.hidden{display:none}.topline{display:flex;align-items:center;gap:8px;margin:0 0 8px;flex-wrap:wrap}.status{font-size:12px;color:#d1d5db}.user-pill{margin-left:auto;font-size:12px;color:#d1d5db}.notice{background:#fffbeb;border:1px solid #f59e0b;padding:12px;border-radius:12px;margin:10px 0;font-size:13px}
 @media(min-width:650px){.modal.show{align-items:center;justify-content:center}.sheet{max-width:520px;border-radius:18px}}
 </style>
@@ -212,7 +212,29 @@ function sortedSelectedByStore(store){
   return selected.sort((a,b)=>compareLearnedItems(a,b,store,lastPos,ids));
 }
 function ensureStore(store){store=(store||"PAK'nSAVE").trim()||"PAK'nSAVE";if(!state.stores.includes(store))state.stores.push(store);if(!state.routesByStore[store])state.routesByStore[store]=[];if(!state.pairsByStore[store])state.pairsByStore[store]={};if(!state.orderStatsByStore[store])state.orderStatsByStore[store]={};return store}
-function filterCards(q){q=q.toLowerCase();document.querySelectorAll(".item-card").forEach(c=>c.style.display=c.dataset.name.includes(q)?"":"none")}
+function filterCards(q){
+  q=(q||"").trim().toLowerCase();
+  const masterSections=document.querySelectorAll("#masterSections .section");
+  const oldResults=document.getElementById("searchResults");
+  if(oldResults)oldResults.remove();
+  if(!q){masterSections.forEach(s=>s.style.display="");return;}
+  const matches=[];
+  document.querySelectorAll("#masterSections .item-card").forEach(card=>{
+    const match=card.dataset.name.includes(q);
+    card.style.display=match?"":"none";
+    if(match)matches.push(card.cloneNode(true));
+  });
+  masterSections.forEach(s=>s.style.display="none");
+  const box=document.createElement("div");
+  box.id="searchResults";
+  box.className="section search-results";
+  box.innerHTML='<h2>Search results</h2>';
+  if(matches.length){matches.forEach(card=>box.appendChild(card));}
+  else{box.insertAdjacentHTML("beforeend",'<div class="muted">No items found.</div>');}
+  const search=document.getElementById("search");
+  const firstBar=search?.closest(".bar");
+  if(firstBar)firstBar.insertAdjacentElement("afterend",box);
+}
 function addStoreFromField(fieldId){
   const field=document.getElementById(fieldId);
   const name=prompt("Enter the new store name:",field&&field.value!=="__ADD_STORE__"?field.value:"");
@@ -291,7 +313,7 @@ function renderMaster(app){
   const ordered=categoryList().map(cat=>[cat,(groups[cat]||[]).sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}))]);
   const uid=currentUser?.id||"";
   const migrationNotice = ((!hasMigrationCompleted(uid) && (deviceLocalDataAvailable || backupHasCustomData(uid)))) ? `<div class="notice"><b>Device data found.</b> This device has Shop Path data that is not yet confirmed as synced to your cloud account. <button class="secondary" type="button" onclick="migrateNow()">Migrate this device</button></div>` : "";
-  app.innerHTML=`${migrationNotice}<div class="bar"><input id="search" placeholder="Search master list…"><button class="primary" onclick="openAdd()">Add Item</button></div><div class="bar"><button class="secondary" onclick="openStoreManager()">＋ Add Store</button><button class="secondary" onclick="addCategory()">＋ Add Category</button></div><p class="muted">Tap an item to include it in this week's shop. Tap the item name to set amount and store.</p>${ordered.map(([cat,arr])=>`<div class="section"><h2>${esc(cat)}</h2>${arr.length?arr.map(x=>`<div class="card item-card" data-name="${esc(x.name.toLowerCase())}"><div class="row"><button class="buy ${x.selected?"done":""}" onclick="toggleSelect('${esc(x.id)}')">${x.selected?"✓":"+"}</button><button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div><div class="storetag">Tap item to set quantity & store</div></button><button class="secondary" onclick="editItem('${esc(x.id)}')">Edit</button><button class="secondary" onclick="deleteItem('${esc(x.id)}')">Delete</button></div></div>`).join(""):`<div class="muted">No items in this category yet.</div>`}</div>`).join("")}`; document.getElementById("search").oninput=e=>filterCards(e.target.value);
+  app.innerHTML=`${migrationNotice}<div class="bar"><input id="search" placeholder="Search master list…"><button class="primary" onclick="openAdd()">Add Item</button></div><div class="bar"><button class="secondary" onclick="openStoreManager()">＋ Add Store</button><button class="secondary" onclick="addCategory()">＋ Add Category</button></div><p class="muted">Tap an item to include it in this week's shop. Tap the item name to set amount and store.</p><div id="masterSections">${ordered.map(([cat,arr])=>`<div class="section"><h2>${esc(cat)}</h2>${arr.length?arr.map(x=>`<div class="card item-card" data-name="${esc(x.name.toLowerCase())}"><div class="row"><button class="buy ${x.selected?"done":""}" onclick="toggleSelect('${esc(x.id)}')">${x.selected?"✓":"+"}</button><button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div><div class="storetag">Tap item to set quantity & store</div></button><button class="secondary" onclick="editItem('${esc(x.id)}')">Edit</button><button class="secondary" onclick="deleteItem('${esc(x.id)}')">Delete</button></div></div>`).join(""):`<div class="muted">No items in this category yet.</div>`}</div>`).join("")}</div>`; document.getElementById("search").oninput=e=>filterCards(e.target.value);
 }
 async function clearRoute(){
   if(!confirm("Clear all learned route history for every store? Your Master List and current weekly shop will not be changed."))return;
