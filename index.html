@@ -124,6 +124,20 @@ function backupLocalBeforeMigration(uid){
   return backup;
 }
 function hasMigrationCompleted(uid){return localStorage.getItem(migrationMarkerKey(uid))!==null;}
+function getMigrationBackup(uid){
+  try{const raw=localStorage.getItem(migrationBackupKey(uid));if(!raw)return null;const parsed=JSON.parse(raw);return parsed?.state||null;}catch(e){console.warn(e);return null;}
+}
+function hasMigrationBackup(uid){return !!getMigrationBackup(uid);}
+function hasCustomDataInSnapshot(snapshot){
+  if(!snapshot)return false;
+  const baseNames=new Set(BASE_ITEMS.map(x=>x.id));
+  const extraStores=(snapshot.stores||[]).some(st=>!DEFAULT_STORES.includes(st));
+  const extraCats=(snapshot.categories||[]).some(cat=>!CATEGORIES.some(c=>c.toLowerCase()===String(cat).toLowerCase()));
+  const extraItems=(snapshot.items||[]).some(x=>!baseNames.has(x.name));
+  const changedItems=(snapshot.items||[]).some(x=>{const b=BASE_ITEMS.find(item=>item.name===x.name);return b ? String(x.usualQty)!==String(b.usualQty)||String(x.usualUnit)!==String(b.usualUnit)||(x.store&&x.store!=="PAK'nSAVE") : true;});
+  return (snapshot.items||[]).length!==BASE_ITEMS.length||extraStores||extraCats||extraItems||changedItems||Object.keys(snapshot.lastRoutesByStore||{}).length>0||Object.keys(snapshot.orderStatsByStore||{}).length>0;
+}
+function backupHasCustomData(uid){return hasCustomDataInSnapshot(getMigrationBackup(uid));}
 function markMigrationCompleted(uid){localStorage.setItem(migrationMarkerKey(uid),new Date().toISOString());}
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function categoryList(){return state.categories.slice()}
@@ -234,7 +248,8 @@ function itemCard(x){return `<div class="card item-card" data-name="${esc((x.nam
 function renderMaster(app){
   const groups={}; state.items.forEach(x=>(groups[x.category]??=[]).push(x));
   const ordered=categoryList().map(cat=>[cat,(groups[cat]||[]).sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}))]);
-  const migrationNotice = (!hasMigrationCompleted(currentUser?.id||"") && hasLocalCustomData()) ? `<div class="notice"><b>Device data found.</b> Your previous Grocery Route data may still be on this Mac. <button class="secondary" type="button" onclick="migrateNow()">Migrate this device</button></div>` : "";
+  const uid=currentUser?.id||"";
+  const migrationNotice = (!hasMigrationCompleted(uid) && (hasLocalCustomData() || backupHasCustomData(uid))) ? `<div class="notice"><b>Device data found.</b> Your previous Grocery Route data is available on this Mac. <button class="secondary" type="button" onclick="migrateNow()">Migrate this device</button></div>` : "";
   app.innerHTML=`${migrationNotice}<div class="bar"><input id="search" placeholder="Search master list…"><button class="primary" onclick="openAdd()">Add Item</button></div><div class="bar"><button class="secondary" onclick="openStoreManager()">＋ Add Store</button><button class="secondary" onclick="addCategory()">＋ Add Category</button></div><p class="muted">Tap an item to include it in this week's shop. Tap the item name to set amount and store.</p>${ordered.map(([cat,arr])=>`<div class="section"><h2>${esc(cat)}</h2>${arr.length?arr.map(x=>`<div class="card item-card" data-name="${esc(x.name.toLowerCase())}"><div class="row"><button class="buy ${x.selected?"done":""}" onclick="toggleSelect('${esc(x.id)}')">${x.selected?"✓":"+"}</button><button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div><div class="storetag">Tap item to set quantity & store</div></button><button class="secondary" onclick="editItem('${esc(x.id)}')">Edit</button><button class="secondary" onclick="deleteItem('${esc(x.id)}')">Delete</button></div></div>`).join(""):`<div class="muted">No items in this category yet.</div>`}</div>`).join("")}`; document.getElementById("search").oninput=e=>filterCards(e.target.value);
 }
 function renderRoute(app){
@@ -389,6 +404,23 @@ async function migrateOrMergeLocalData(remote){
   localDirty=false;
   setSyncStatus('Migration complete');
 }
+async function recoverMigrationBackup(remote){
+  if(!currentUser)return;
+  const uid=currentUser.id;
+  const backup=getMigrationBackup(uid);
+  if(!backup)throw new Error('No device migration backup was found.');
+  backupLocalBeforeMigration(uid);
+  await downloadIntoLocal(remote);
+  mergeLocalIntoCurrent(backup);
+  await syncMasterData();
+  await replaceCloudRoutes();
+  await verifyCloudMatchesLocal();
+  markMigrationCompleted(uid);
+  saveLocal();
+  localDirty=false;
+  setSyncStatus('Migration complete');
+}
+
 async function migrateNow(){
   if(!currentUser)return;
   try{
@@ -409,6 +441,15 @@ async function loadCloudOrMigrate(){
   await ensureProfile();
   const remote=await fetchRemoteState();
   const uid=currentUser.id;
+  // A previous migration attempt may have backed up the device data before a later
+  // step failed. Recover that backup before allowing the cloud copy to replace it.
+  if(!hasMigrationCompleted(uid) && backupHasCustomData(uid)){
+    const backup=getMigrationBackup(uid);
+    const ok=confirm('A protected backup of your previous device data was found. It contains custom Grocery Route data such as your Pet category, added items and/or route history. I will merge that backup with the cloud data without deleting either side. Continue?');
+    if(ok){await recoverMigrationBackup(remote);return;}
+    setSyncStatus('Migration available');
+    return;
+  }
   if(hasMigrationCompleted(uid)){
     // A completed migration means the local device has already been merged into
     // the account. From this point forward the cloud copy is the shared source of
