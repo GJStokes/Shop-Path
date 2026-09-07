@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.webmanifest">
-<title>Shop Path</title>
+<title>Grocery Route</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f3f4f6;color:#111827}
 header{position:sticky;top:0;z-index:10;background:#111827;color:white;padding:14px 14px 10px;box-shadow:0 2px 10px #0002}
@@ -409,7 +409,10 @@ async function loadCloudOrMigrate(){
   await ensureProfile();
   const remote=await fetchRemoteState();
   const uid=currentUser.id;
-  if(hasMigrationCompleted(uid) && !hasLocalCustomData()){
+  if(hasMigrationCompleted(uid)){
+    // A completed migration means the local device has already been merged into
+    // the account. From this point forward the cloud copy is the shared source of
+    // truth for this signed-in device.
     await downloadIntoLocal(remote);
     setSyncStatus('Synced');
     return;
@@ -505,15 +508,56 @@ async function replaceCloudRoutes(){
 }
 async function syncMasterData(){
   const uid=currentUser.id;
-  const cats=state.categories.map((name,i)=>({user_id:uid,name,sort_order:i}));let r=await db.from("categories").upsert(cats,{onConflict:"user_id,name"});if(r.error)throw r.error;
-  const stores=state.stores.map((name,i)=>({user_id:uid,name,sort_order:i}));r=await db.from("stores").upsert(stores,{onConflict:"user_id,name"});if(r.error)throw r.error;
-  // Remove cloud rows that no longer exist locally.
-  const {data:rcats,error:rc}=await db.from("categories").select("id,name").eq("user_id",uid);if(rc)throw rc;const deadCats=rc.filter(x=>!state.categories.some(c=>c===x.name));if(deadCats.length){r=await db.from("categories").delete().in("id",deadCats.map(x=>x.id));if(r.error)throw r.error}
-  const {data:rstores,error:rs}=await db.from("stores").select("id,name").eq("user_id",uid);if(rs)throw rs;const deadStores=rstores.filter(x=>!state.stores.some(s=>s===x.name));if(deadStores.length){r=await db.from("stores").delete().in("id",deadStores.map(x=>x.id));if(r.error)throw r.error}
-  const {data:cats2,error:ce}=await db.from("categories").select("id,name").eq("user_id",uid);if(ce)throw ce;const {data:stores2,error:se}=await db.from("stores").select("id,name").eq("user_id",uid);if(se)throw se;
-  const catMap=Object.fromEntries(cats2.map(x=>[x.name,x.id])),storeMap=Object.fromEntries(stores2.map(x=>[x.name,x.id]));
-  const rows=state.items.map((x,i)=>({user_id:uid,name:x.name,category_id:catMap[x.category]||null,default_store_id:storeMap[x.store||"PAK'nSAVE"]||null,usual_quantity:Number(x.usualQty)||1,usual_unit:x.usualUnit||"each",sort_order:i}));r=await db.from("master_items").upsert(rows,{onConflict:"user_id,name"});if(r.error)throw r.error;
-  const {data:ritems,error:ri}=await db.from("master_items").select("id,name").eq("user_id",uid);if(ri)throw ri;const deadItems=ritems.filter(x=>!state.items.some(i=>i.name===x.name));if(deadItems.length){r=await db.from("master_items").delete().in("id",deadItems.map(x=>x.id));if(r.error)throw r.error}
+
+  // Upsert local categories and stores first. During migration this is a union of
+  // local + cloud data, so nothing that exists on either side is intentionally lost.
+  const cats=state.categories.map((name,i)=>({user_id:uid,name,sort_order:i}));
+  let r=await db.from("categories").upsert(cats,{onConflict:"user_id,name"});
+  if(r.error)throw r.error;
+
+  const stores=state.stores.map((name,i)=>({user_id:uid,name,sort_order:i}));
+  r=await db.from("stores").upsert(stores,{onConflict:"user_id,name"});
+  if(r.error)throw r.error;
+
+  // IMPORTANT: do not delete remote categories/stores during migration or normal
+  // sync. Deletion is handled explicitly by the user's Delete action in the app.
+  // This avoids a transient/null response from turning into a destructive migration.
+  const {data:cats2,error:ce}=await db.from("categories").select("id,name").eq("user_id",uid);
+  if(ce)throw ce;
+  const {data:stores2,error:se}=await db.from("stores").select("id,name").eq("user_id",uid);
+  if(se)throw se;
+
+  const safeCats=Array.isArray(cats2)?cats2:[];
+  const safeStores=Array.isArray(stores2)?stores2:[];
+  const catMap=Object.fromEntries(safeCats.map(x=>[x.name,x.id]));
+  const storeMap=Object.fromEntries(safeStores.map(x=>[x.name,x.id]));
+
+  const rows=state.items.map((x,i)=>({
+    user_id:uid,
+    name:x.name,
+    category_id:catMap[x.category]||null,
+    default_store_id:storeMap[x.store||"PAK'nSAVE"]||null,
+    usual_quantity:Number(x.usualQty)||1,
+    usual_unit:x.usualUnit||"each",
+    sort_order:i
+  }));
+  r=await db.from("master_items").upsert(rows,{onConflict:"user_id,name"});
+  if(r.error)throw r.error;
+
+  const {data:ritems,error:ri}=await db.from("master_items").select("id,name").eq("user_id",uid);
+  if(ri)throw ri;
+  const safeItems=Array.isArray(ritems)?ritems:[];
+
+  // Do not use Array.filter on an uncertain API payload. The API should return an
+  // array, but treating a missing payload as [] avoids the null.filter crash seen
+  // during migration.
+  const localItemNames=new Set(state.items.map(i=>i.name));
+  const deadItems=safeItems.filter(x=>!localItemNames.has(x.name));
+  if(deadItems.length){
+    r=await db.from("master_items").delete().in("id",deadItems.map(x=>x.id));
+    if(r.error)throw r.error;
+  }
+
   await syncOpenTrip();
 }
 async function syncToCloud(forceRoutes=false){if(!currentUser||!cloudReady||syncing)return;syncing=true;try{setSyncStatus("Syncing…");await syncMasterData();if(forceRoutes)await replaceCloudRoutes();localDirty=false;setSyncStatus("Synced")}catch(err){console.error(err);setSyncStatus("Sync error")}finally{syncing=false}}
