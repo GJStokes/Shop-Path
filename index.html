@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.webmanifest">
-<title>PAK'nSAVE Grocery Route</title>
+<title>Grocery Route</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f3f4f6;color:#111827}
 header{position:sticky;top:0;z-index:10;background:#111827;color:white;padding:14px 14px 10px;box-shadow:0 2px 10px #0002}
@@ -14,84 +14,51 @@ main{max-width:760px;margin:auto;padding:12px 12px 100px}.bar{display:flex;gap:8
 button{font:inherit}.primary{background:#111827;color:white;border:0;border-radius:10px;padding:12px 14px;font-weight:700}.secondary{background:white;border:1px solid #d1d5db;border-radius:10px;padding:10px 12px}
 .card{background:white;border-radius:14px;margin:8px 0;padding:12px;box-shadow:0 1px 4px #0001}.row{display:flex;align-items:center;gap:10px}.itemname{font-weight:700;flex:1}.cat{font-size:12px;color:#6b7280;margin-top:3px}
 .buy{width:42px;height:42px;border-radius:12px;border:2px solid #9ca3af;background:white;font-size:20px}.buy.done{background:#111827;color:white;border-color:#111827}.qty{display:flex;align-items:center;gap:5px}.qty input{width:54px;text-align:center;padding:7px;border:1px solid #d1d5db;border-radius:8px}.qty select{padding:7px;border:1px solid #d1d5db;border-radius:8px;background:white}
-.section{margin-top:18px}.section h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}.storetag{font-size:12px;color:#374151;margin-top:3px;font-weight:600}.store-input{font:inherit;font-weight:600;border:1px solid #d1d5db;border-radius:8px;padding:3px 6px;max-width:180px;background:#fff}.item-open{border:0;background:transparent;padding:0;text-align:left;cursor:pointer;flex:1}.item-open:active{opacity:.7}
+.section{margin-top:18px}.section h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}.storetag{font-size:12px;color:#374151;margin-top:3px;font-weight:600}.item-open{border:0;background:transparent;padding:0;text-align:left;cursor:pointer;flex:1}.item-open:active{opacity:.7}
 .muted{color:#6b7280;font-size:13px}.empty{padding:30px;text-align:center;color:#6b7280}.stats{display:flex;gap:8px;margin-bottom:10px}.stat{background:white;border-radius:12px;padding:10px;flex:1;text-align:center}.stat b{display:block;font-size:20px}
 .modal{position:fixed;inset:0;background:#0007;display:none;z-index:20;padding:18px}.modal.show{display:flex;align-items:flex-end}.sheet{background:white;border-radius:18px 18px 0 0;width:100%;max-height:85vh;overflow:auto;padding:16px}.sheet h2{margin-top:0}.sheet input,.sheet select{width:100%;padding:12px;margin:5px 0;border:1px solid #d1d5db;border-radius:10px;font-size:16px}.actions{display:flex;gap:8px;margin-top:10px}.actions button{flex:1}.store-list{margin:10px 0}.store-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #eee}.store-row span{flex:1;font-weight:600}.store-row button{padding:7px 10px}.store-add{display:flex;gap:8px;margin-top:12px}.store-add input{flex:1;margin:0}.store-add button{white-space:nowrap}
+#auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:#f3f4f6}.auth-card{width:min(100%,430px);background:white;border-radius:20px;padding:24px;box-shadow:0 10px 35px #0002}.auth-card h2{margin:0 0 6px}.auth-card input{width:100%;padding:13px;border:1px solid #d1d5db;border-radius:10px;font-size:16px;margin:6px 0}.auth-actions{display:flex;gap:8px;margin-top:10px}.auth-actions button{flex:1}.auth-msg{min-height:24px;margin-top:10px;font-size:14px;color:#b00020}.auth-links{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap}.auth-links button{border:0;background:none;padding:0;color:#2563eb;cursor:pointer}#app-shell{display:none}#app-shell.authenticated{display:block}#auth.hidden{display:none}.topline{display:flex;align-items:center;gap:8px;margin:0 0 8px;flex-wrap:wrap}.status{font-size:12px;color:#d1d5db}.user-pill{margin-left:auto;font-size:12px;color:#d1d5db}.notice{background:#fffbeb;border:1px solid #f59e0b;padding:12px;border-radius:12px;margin:10px 0;font-size:13px}
 @media(min-width:650px){.modal.show{align-items:center;justify-content:center}.sheet{max-width:520px;border-radius:18px}}
 </style>
-
-<style>
-  #access-lock {
-    position: fixed;
-    inset: 0;
-    z-index: 99999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    background: #f5f5f5;
-  }
-  #access-lock.hidden { display: none; }
-  .access-card {
-    width: min(100%, 380px);
-    padding: 28px;
-    border-radius: 20px;
-    background: white;
-    box-shadow: 0 10px 35px rgba(0,0,0,.12);
-    text-align: center;
-  }
-  .access-card h1 { margin: 0 0 8px; font-size: 24px; }
-  .access-card p { margin: 0 0 20px; color: #666; }
-  #access-code {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 14px 16px;
-    border: 1px solid #ccc;
-    border-radius: 12px;
-    font-size: 18px;
-    text-align: center;
-    letter-spacing: 3px;
-  }
-  #unlock-app {
-    width: 100%;
-    margin-top: 12px;
-    padding: 14px 16px;
-    border: 0;
-    border-radius: 12px;
-    font-size: 17px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  #access-error { min-height: 22px; margin-top: 10px; color: #b00020; font-size: 14px; }
-</style>
-
 </head>
 <body>
-
-<div id="access-lock">
-  <div class="access-card">
-    <h1>🔒 Private App</h1>
-    <p>Enter the family access code to continue.</p>
-    <input id="access-code" type="password" inputmode="numeric" autocomplete="off"
-           placeholder="Access code" aria-label="Family access code">
-    <button id="unlock-app" type="button">Unlock</button>
-    <div id="access-error" role="alert"></div>
+<div id="auth">
+  <div class="auth-card">
+    <h2>Grocery Route</h2>
+    <p class="muted">Sign in to keep your list, stores, categories and route learning synced across your devices.</p>
+    <input id="authEmail" type="email" autocomplete="email" placeholder="Email address">
+    <input id="authPassword" type="password" autocomplete="current-password" placeholder="Password">
+    <div class="auth-actions">
+      <button class="primary" id="signInBtn">Sign in</button>
+      <button class="secondary" id="signUpBtn">Create account</button>
+    </div>
+    <div class="auth-links">
+      <button id="resetBtn" type="button">Forgot password?</button>
+    </div>
+    <div id="authMsg" class="auth-msg" role="alert"></div>
   </div>
 </div>
 
+<div id="app-shell">
 <header>
-<h1>PAK'nSAVE Grocery Route</h1>
-<div class="tabs">
-<button class="tab active" id="tabShop">This Week</button>
-<button class="tab" id="tabMaster">Master List</button>
-<button class="tab" id="tabRoute">Route</button>
-</div>
+  <div class="topline"><h1>Grocery Route</h1><span class="status" id="syncStatus">Cloud sync ready</span><span class="user-pill" id="userEmail"></span><button class="secondary" style="padding:6px 9px" id="signOutBtn">Sign out</button></div>
+  <div class="tabs">
+    <button class="tab active" id="tabShop">This Week</button>
+    <button class="tab" id="tabMaster">Master List</button>
+    <button class="tab" id="tabRoute">Route</button>
+  </div>
 </header>
 <main id="app"></main>
+</div>
 
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+const SUPABASE_URL="https://dyfdsvefpxaoIuctmxuo.supabase.co".toLowerCase();
+const SUPABASE_PUBLISHABLE_KEY="sb_publishable_8Tb2Ndc6d2TpEqj7oIFJvg_7CgYv9Bm";
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+
 const BASE_ITEMS = [{"id":"Apples","name":"Apples","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Avocado","name":"Avocado","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Bananas","name":"Bananas","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"bunch","shopQty":"1","shopUnit":"bunch"},{"id":"Broccoli","name":"Broccoli","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Cabbage","name":"Cabbage","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Capsicum","name":"Capsicum","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Carrots","name":"Carrots","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"kg","shopQty":"1","shopUnit":"kg"},{"id":"Cauliflower","name":"Cauliflower","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Coriander","name":"Coriander","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"bunch","shopQty":"1","shopUnit":"bunch"},{"id":"Courgettes","name":"Courgettes","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"kg","shopQty":"1","shopUnit":"kg"},{"id":"Cucumber","name":"Cucumber","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Garlic","name":"Garlic","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Ginger","name":"Ginger","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Leeks","name":"Leeks","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"bunch","shopQty":"1","shopUnit":"bunch"},{"id":"Lemons","name":"Lemons","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Lettuce","name":"Lettuce","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Limes","name":"Limes","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Mandarins","name":"Mandarins","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Mushrooms","name":"Mushrooms","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Oranges","name":"Oranges","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Parsnips","name":"Parsnips","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"kg","shopQty":"1","shopUnit":"kg"},{"id":"Potatoes","name":"Potatoes","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"kg","shopQty":"1","shopUnit":"kg"},{"id":"Pumpkin","name":"Pumpkin","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Red Kumara","name":"Red Kumara","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"kg","shopQty":"1","shopUnit":"kg"},{"id":"Orange Kumara","name":"Orange Kumara","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"kg","shopQty":"1","shopUnit":"kg"},{"id":"Spinach","name":"Spinach","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Spring Onions","name":"Spring Onions","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"bunch","shopQty":"1","shopUnit":"bunch"},{"id":"Tomatoes","name":"Tomatoes","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"kg","shopQty":"1","shopUnit":"kg"},{"id":"Wombok","name":"Wombok","category":"Fruit & Vegetables","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Dark Rye Bread","name":"Dark Rye Bread","category":"Bread & Bakery","usualQty":"1","usualUnit":"loaf","shopQty":"1","shopUnit":"loaf"},{"id":"White Bread","name":"White Bread","category":"Bread & Bakery","usualQty":"1","usualUnit":"loaf","shopQty":"1","shopUnit":"loaf"},{"id":"Gluten Free Bread","name":"Gluten Free Bread","category":"Bread & Bakery","usualQty":"1","usualUnit":"loaf","shopQty":"1","shopUnit":"loaf"},{"id":"Soy Milk","name":"Soy Milk","category":"Fridge, Dairy & Eggs","usualQty":"1","usualUnit":"bottle","shopQty":"1","shopUnit":"bottle"},{"id":"Eggs","name":"Eggs","category":"Fridge, Dairy & Eggs","usualQty":"12","usualUnit":"each","shopQty":"12","shopUnit":"each"},{"id":"Yoghurt","name":"Yoghurt","category":"Fridge, Dairy & Eggs","usualQty":"1","usualUnit":"tub","shopQty":"1","shopUnit":"tub"},{"id":"Butter","name":"Butter","category":"Fridge, Dairy & Eggs","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Tofu","name":"Tofu","category":"Fridge, Dairy & Eggs","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Blue Cheese","name":"Blue Cheese","category":"Fridge, Dairy & Eggs","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Camembert","name":"Camembert","category":"Fridge, Dairy & Eggs","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Brie","name":"Brie","category":"Fridge, Dairy & Eggs","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Cream Cheese","name":"Cream Cheese","category":"Fridge, Dairy & Eggs","usualQty":"1","usualUnit":"tub","shopQty":"1","shopUnit":"tub"},{"id":"Feta","name":"Feta","category":"Fridge, Dairy & Eggs","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Cheese","name":"Cheese","category":"Fridge, Dairy & Eggs","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Fish","name":"Fish","category":"Meat & Seafood","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Pork","name":"Pork","category":"Meat & Seafood","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Sausages","name":"Sausages","category":"Meat & Seafood","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Prawns / Shrimp","name":"Prawns / Shrimp","category":"Meat & Seafood","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Salmon","name":"Salmon","category":"Meat & Seafood","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Basmati Rice","name":"Basmati Rice","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Jasmine Rice","name":"Jasmine Rice","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Red Lentils","name":"Red Lentils","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Quinoa","name":"Quinoa","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Canned Chickpeas","name":"Canned Chickpeas","category":"Pantry","usualQty":"1","usualUnit":"tin","shopQty":"1","shopUnit":"tin"},{"id":"Canned Red Kidney Beans","name":"Canned Red Kidney Beans","category":"Pantry","usualQty":"1","usualUnit":"tin","shopQty":"1","shopUnit":"tin"},{"id":"Canned Lentils","name":"Canned Lentils","category":"Pantry","usualQty":"1","usualUnit":"tin","shopQty":"1","shopUnit":"tin"},{"id":"Canned Cannellini Beans","name":"Canned Cannellini Beans","category":"Pantry","usualQty":"1","usualUnit":"tin","shopQty":"1","shopUnit":"tin"},{"id":"Canned Black Beans","name":"Canned Black Beans","category":"Pantry","usualQty":"1","usualUnit":"tin","shopQty":"1","shopUnit":"tin"},{"id":"Canned Tomatoes","name":"Canned Tomatoes","category":"Pantry","usualQty":"1","usualUnit":"tin","shopQty":"1","shopUnit":"tin"},{"id":"Tomato Paste","name":"Tomato Paste","category":"Pantry","usualQty":"1","usualUnit":"tin","shopQty":"1","shopUnit":"tin"},{"id":"Tomato Puree","name":"Tomato Puree","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Tomato Sauce","name":"Tomato Sauce","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Sunflower Seeds","name":"Sunflower Seeds","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Pumpkin Seeds","name":"Pumpkin Seeds","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Chia Seeds","name":"Chia Seeds","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Sultanas","name":"Sultanas","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Dates","name":"Dates","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Craisins","name":"Craisins","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Peanuts","name":"Peanuts","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Gluten Free Flour","name":"Gluten Free Flour","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Gluten Free Self-Raising Flour","name":"Gluten Free Self-Raising Flour","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Oats","name":"Oats","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Cornflakes","name":"Cornflakes","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Sugar","name":"Sugar","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Brown Sugar","name":"Brown Sugar","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Coffee","name":"Coffee","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Baking Powder","name":"Baking Powder","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Baking Soda","name":"Baking Soda","category":"Pantry","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Olive Oil","name":"Olive Oil","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Canola Oil","name":"Canola Oil","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Sesame Oil","name":"Sesame Oil","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Sesame Seeds","name":"Sesame Seeds","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Peanut Butter","name":"Peanut Butter","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"English Mustard","name":"English Mustard","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Dijon Mustard","name":"Dijon Mustard","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Kewpie Mayonnaise","name":"Kewpie Mayonnaise","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Mustard Powder","name":"Mustard Powder","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"White Vinegar","name":"White Vinegar","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Rice Wine Vinegar","name":"Rice Wine Vinegar","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Rice Vinegar","name":"Rice Vinegar","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Mirin","name":"Mirin","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Soy Sauce (GF)","name":"Soy Sauce (GF)","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Dark Soy Sauce (GF)","name":"Dark Soy Sauce (GF)","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Oyster Sauce (GF)","name":"Oyster Sauce (GF)","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Coriander Powder","name":"Coriander Powder","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Cumin Powder","name":"Cumin Powder","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Cumin Seeds","name":"Cumin Seeds","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Garam Masala","name":"Garam Masala","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Samba Curry Powder","name":"Samba Curry Powder","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Cinnamon Quill","name":"Cinnamon Quill","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Ground Cinnamon","name":"Ground Cinnamon","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Turmeric","name":"Turmeric","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Kashmiri Chilli Powder","name":"Kashmiri Chilli Powder","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Dried Oregano","name":"Dried Oregano","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Dried Basil","name":"Dried Basil","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Dried Thyme","name":"Dried Thyme","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Dried Rosemary","name":"Dried Rosemary","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Salt","name":"Salt","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Sea Salt","name":"Sea Salt","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Black Peppercorns","name":"Black Peppercorns","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"White Pepper","name":"White Pepper","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Star Anise","name":"Star Anise","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Cloves","name":"Cloves","category":"Oils, Sauces, Condiments & Spices","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Frozen Blueberries","name":"Frozen Blueberries","category":"Frozen","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Fries","name":"Fries","category":"Frozen","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Frozen Peas","name":"Frozen Peas","category":"Frozen","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Frozen Corn","name":"Frozen Corn","category":"Frozen","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Frozen Mushrooms","name":"Frozen Mushrooms","category":"Frozen","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Frozen Onions","name":"Frozen Onions","category":"Frozen","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Frozen Broccoli","name":"Frozen Broccoli","category":"Frozen","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Frozen Cauliflower","name":"Frozen Cauliflower","category":"Frozen","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Brussels Sprouts","name":"Brussels Sprouts","category":"Frozen","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Basa Fish","name":"Basa Fish","category":"Frozen","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Ice","name":"Ice","category":"Frozen","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Ice Cream","name":"Ice Cream","category":"Frozen","usualQty":"1","usualUnit":"bag","shopQty":"1","shopUnit":"bag"},{"id":"Tea","name":"Tea","category":"Drinks","usualQty":"1","usualUnit":"box","shopQty":"1","shopUnit":"box"},{"id":"Jasmine Tea","name":"Jasmine Tea","category":"Drinks","usualQty":"1","usualUnit":"box","shopQty":"1","shopUnit":"box"},{"id":"Lady Grey Tea","name":"Lady Grey Tea","category":"Drinks","usualQty":"1","usualUnit":"box","shopQty":"1","shopUnit":"box"},{"id":"Rooibos Tea","name":"Rooibos Tea","category":"Drinks","usualQty":"1","usualUnit":"box","shopQty":"1","shopUnit":"box"},{"id":"Cocoa","name":"Cocoa","category":"Drinks","usualQty":"1","usualUnit":"box","shopQty":"1","shopUnit":"box"},{"id":"Soda Water","name":"Soda Water","category":"Drinks","usualQty":"1","usualUnit":"bottle","shopQty":"1","shopUnit":"bottle"},{"id":"Coconut Milk","name":"Coconut Milk","category":"Jars, Pickles & Preserved","usualQty":"1","usualUnit":"tin","shopQty":"1","shopUnit":"tin"},{"id":"Coconut Cream","name":"Coconut Cream","category":"Jars, Pickles & Preserved","usualQty":"1","usualUnit":"tin","shopQty":"1","shopUnit":"tin"},{"id":"Olives","name":"Olives","category":"Jars, Pickles & Preserved","usualQty":"1","usualUnit":"jar","shopQty":"1","shopUnit":"jar"},{"id":"Capers","name":"Capers","category":"Jars, Pickles & Preserved","usualQty":"1","usualUnit":"jar","shopQty":"1","shopUnit":"jar"},{"id":"Sauerkraut","name":"Sauerkraut","category":"Jars, Pickles & Preserved","usualQty":"1","usualUnit":"jar","shopQty":"1","shopUnit":"jar"},{"id":"Jalapeños","name":"Jalapeños","category":"Jars, Pickles & Preserved","usualQty":"1","usualUnit":"jar","shopQty":"1","shopUnit":"jar"},{"id":"Pickled Ginger","name":"Pickled Ginger","category":"Jars, Pickles & Preserved","usualQty":"1","usualUnit":"jar","shopQty":"1","shopUnit":"jar"},{"id":"Cornflour","name":"Cornflour","category":"Baking & Cooking Essentials","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Vanilla Essence","name":"Vanilla Essence","category":"Baking & Cooking Essentials","usualQty":"1","usualUnit":"bottle","shopQty":"1","shopUnit":"bottle"},{"id":"Maple Syrup","name":"Maple Syrup","category":"Baking & Cooking Essentials","usualQty":"1","usualUnit":"bottle","shopQty":"1","shopUnit":"bottle"},{"id":"Honey","name":"Honey","category":"Baking & Cooking Essentials","usualQty":"1","usualUnit":"jar","shopQty":"1","shopUnit":"jar"},{"id":"Chicken Stock","name":"Chicken Stock","category":"Baking & Cooking Essentials","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Beef Stock","name":"Beef Stock","category":"Baking & Cooking Essentials","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Vegetable Stock","name":"Vegetable Stock","category":"Baking & Cooking Essentials","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Gourmet Stock","name":"Gourmet Stock","category":"Baking & Cooking Essentials","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Breadcrumbs (GF)","name":"Breadcrumbs (GF)","category":"Baking & Cooking Essentials","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Pasta (GF)","name":"Pasta (GF)","category":"Pasta & Noodles","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Udon Noodles","name":"Udon Noodles","category":"Pasta & Noodles","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Rice Noodles","name":"Rice Noodles","category":"Pasta & Noodles","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Korean Noodles","name":"Korean Noodles","category":"Pasta & Noodles","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Miso","name":"Miso","category":"Asian Ingredients","usualQty":"1","usualUnit":"tub","shopQty":"1","shopUnit":"tub"},{"id":"Wasabi","name":"Wasabi","category":"Asian Ingredients","usualQty":"1","usualUnit":"tube","shopQty":"1","shopUnit":"tube"},{"id":"Nori","name":"Nori","category":"Asian Ingredients","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Rice Paper","name":"Rice Paper","category":"Asian Ingredients","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Rexona Deodorant","name":"Rexona Deodorant","category":"Personal Care","usualQty":"1","usualUnit":"each","shopQty":"1","shopUnit":"each"},{"id":"Shampoo","name":"Shampoo","category":"Personal Care","usualQty":"1","usualUnit":"bottle","shopQty":"1","shopUnit":"bottle"},{"id":"Toothpaste","name":"Toothpaste","category":"Personal Care","usualQty":"1","usualUnit":"tube","shopQty":"1","shopUnit":"tube"},{"id":"Soap","name":"Soap","category":"Personal Care","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Body Soap","name":"Body Soap","category":"Personal Care","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Mouthwash","name":"Mouthwash","category":"Personal Care","usualQty":"1","usualUnit":"bottle","shopQty":"1","shopUnit":"bottle"},{"id":"Denture Cleaner","name":"Denture Cleaner","category":"Personal Care","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Paper Towels","name":"Paper Towels","category":"Household & Cleaning","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Toilet Paper","name":"Toilet Paper","category":"Household & Cleaning","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Laundry Sheets","name":"Laundry Sheets","category":"Household & Cleaning","usualQty":"1","usualUnit":"pack","shopQty":"1","shopUnit":"pack"},{"id":"Dishwashing Liquid","name":"Dishwashing Liquid","category":"Household & Cleaning","usualQty":"1","usualUnit":"bottle","shopQty":"1","shopUnit":"bottle"},{"id":"Glad Wrap","name":"Glad Wrap","category":"Household & Cleaning","usualQty":"1","usualUnit":"roll","shopQty":"1","shopUnit":"roll"},{"id":"Baking Paper","name":"Baking Paper","category":"Household & Cleaning","usualQty":"1","usualUnit":"roll","shopQty":"1","shopUnit":"roll"},{"id":"Tin Foil","name":"Tin Foil","category":"Household & Cleaning","usualQty":"1","usualUnit":"roll","shopQty":"1","shopUnit":"roll"},{"id":"Toilet Cleaner","name":"Toilet Cleaner","category":"Household & Cleaning","usualQty":"1","usualUnit":"bottle","shopQty":"1","shopUnit":"bottle"},{"id":"Rubber Gloves","name":"Rubber Gloves","category":"Household & Cleaning","usualQty":"1","usualUnit":"pair","shopQty":"1","shopUnit":"pair"}];
 const CATEGORIES=[
   "Fruit & Vegetables","Bread & Bakery","Fridge, Dairy & Eggs","Meat & Seafood",
@@ -99,493 +66,263 @@ const CATEGORIES=[
   "Jars, Pickles & Preserved","Baking & Cooking Essentials","Pasta & Noodles",
   "Asian Ingredients","Personal Care","Household & Cleaning","Other"
 ];
-const KEY="pns-grocery-v1";
 const DEFAULT_STORES=["PAK'nSAVE","Woolworths","Specialty Store"];
-let state=JSON.parse(localStorage.getItem(KEY)||"null")||{
- items:BASE_ITEMS.map(x=>({...x,store:"PAK'nSAVE",selected:false,bought:false})),
- route:[], pairs:{}, shopStarted:null, stores:[...DEFAULT_STORES], categories:[...CATEGORIES]
-};
-// Migrate older saved lists that did not yet have store information.
-state.items.forEach(x=>{if(!x.store)x.store="PAK'nSAVE"; if(!x.shopStore)x.shopStore=x.store});
-if(!Array.isArray(state.stores))state.stores=[...DEFAULT_STORES];
-DEFAULT_STORES.forEach(st=>{if(!state.stores.includes(st))state.stores.push(st)});
-if(!Array.isArray(state.categories))state.categories=[...CATEGORIES];
-CATEGORIES.forEach(cat=>{if(!state.categories.some(c=>c.toLowerCase()===cat.toLowerCase()))state.categories.push(cat)});
-function categoryList(){ return state.categories.slice(); }
-if(!state.routesByStore){
-  state.routesByStore={};
-  if(Array.isArray(state.route)&&state.route.length)state.routesByStore["PAK'nSAVE"]=[...state.route];
+const KEY="grocery-route-v1";
+const UNITS=["each","bunch","kg","g","pack","bag","box","tin","jar","tub","bottle","loaf","tube","roll","pair","dozen","litre","ml"];
+let state=null;
+let currentUser=null;
+let cloudSyncTimer=null;
+let cloudReady=false;
+let syncing=false;
+let localDirty=false;
+let view="shop";
+
+function freshState(){
+  return {
+    items:BASE_ITEMS.map(x=>({...x,store:"PAK'nSAVE",shopStore:"PAK'nSAVE",selected:false,bought:false})),
+    route:[],pairs:{},shopStarted:null,stores:[...DEFAULT_STORES],categories:[...CATEGORIES],
+    routesByStore:{},pairsByStore:{},lastRoutesByStore:{},orderStatsByStore:{}
+  };
 }
-if(!state.pairsByStore){
-  state.pairsByStore={};
-  if(state.pairs&&typeof state.pairs==='object')state.pairsByStore["PAK'nSAVE"]={...state.pairs};
+function loadLocal(){
+  try {
+    const raw=localStorage.getItem(KEY); if(raw) state=JSON.parse(raw);
+  } catch(e) { console.warn(e); }
+  if(!state) state=freshState();
+  normalizeState();
 }
-// Keep a separate copy of the last completed trip so a new trip can start
-// without losing the route that should be used as the starting suggestion.
-if(!state.lastRoutesByStore){
-  state.lastRoutesByStore={};
-  for(const [st,r] of Object.entries(state.routesByStore||{})){
-    if(Array.isArray(r) && r.length) state.lastRoutesByStore[st]=[...r];
-  }
+function normalizeState(){
+  state.items=Array.isArray(state.items)?state.items:BASE_ITEMS.map(x=>({...x}));
+  state.stores=Array.isArray(state.stores)?state.stores:[...DEFAULT_STORES];
+  state.categories=Array.isArray(state.categories)?state.categories:[...CATEGORIES];
+  state.route=Array.isArray(state.route)?state.route:[];
+  state.pairs=state.pairs&&typeof state.pairs==='object'?state.pairs:{};
+  state.routesByStore=state.routesByStore&&typeof state.routesByStore==='object'?state.routesByStore:{};
+  state.pairsByStore=state.pairsByStore&&typeof state.pairsByStore==='object'?state.pairsByStore:{};
+  state.lastRoutesByStore=state.lastRoutesByStore&&typeof state.lastRoutesByStore==='object'?state.lastRoutesByStore:{};
+  state.orderStatsByStore=state.orderStatsByStore&&typeof state.orderStatsByStore==='object'?state.orderStatsByStore:{};
+  DEFAULT_STORES.forEach(st=>{if(!state.stores.includes(st))state.stores.push(st)});
+  CATEGORIES.forEach(c=>{if(!state.categories.some(x=>x.toLowerCase()===c.toLowerCase()))state.categories.push(c)});
+  state.items.forEach(x=>{
+    if(!x.store)x.store="PAK'nSAVE";
+    if(!x.shopStore)x.shopStore=x.store;
+    if(x.selected==null)x.selected=false;
+    if(x.bought==null)x.bought=false;
+    if(x.usualQty==null)x.usualQty="1";
+    if(!x.usualUnit)x.usualUnit="each";
+    if(x.shopQty==null)x.shopQty=x.usualQty;
+    if(!x.shopUnit)x.shopUnit=x.usualUnit;
+  });
 }
-// Cumulative pairwise ordering history. A|B means A was bought before B.
-// Older versions stored only adjacent pairs; those are retained as useful legacy evidence.
-if(!state.orderStatsByStore){
-  state.orderStatsByStore={};
-  for(const [st,pairs] of Object.entries(state.pairsByStore||{})){
-    state.orderStatsByStore[st]={...(pairs||{})};
-  }
+function saveLocal(){localStorage.setItem(KEY,JSON.stringify(state));localDirty=true;}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function categoryList(){return state.categories.slice()}
+function setSyncStatus(text){const el=document.getElementById("syncStatus");if(el)el.textContent=text}
+function setAuthMsg(text,error=true){const el=document.getElementById("authMsg");if(el){el.textContent=text;el.style.color=error?"#b00020":"#166534"}}
+function authVisible(show){document.getElementById("auth").classList.toggle("hidden",!show);document.getElementById("app-shell").classList.toggle("authenticated",!show)}
+function hasLocalCustomData(){
+  const baseNames=new Set(BASE_ITEMS.map(x=>x.id));
+  const extraStores=state.stores.some(st=>!DEFAULT_STORES.includes(st));
+  const extraCats=state.categories.some(cat=>!CATEGORIES.some(c=>c.toLowerCase()===cat.toLowerCase()));
+  const extraItems=state.items.some(x=>!baseNames.has(x.name));
+  const changedItems=state.items.some(x=>{
+    const b=BASE_ITEMS.find(item=>item.name===x.name);
+    return b ? String(x.usualQty)!==String(b.usualQty)||String(x.usualUnit)!==String(b.usualUnit)||(x.store&&x.store!=="PAK'nSAVE") : true;
+  });
+  return state.items.length!==BASE_ITEMS.length||extraStores||extraCats||extraItems||changedItems||Object.keys(state.lastRoutesByStore).length>0||Object.keys(state.orderStatsByStore).length>0;
 }
-function save(){localStorage.setItem(KEY,JSON.stringify(state))}
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function pairwiseLearningScore(id,store,selected){
- const stats=state.orderStatsByStore[store]||{};
- let score=0;
- for(const other of selected){
-   if(other===id)continue;
-   const forward=stats[id+"|"+other]||0;
-   const reverse=stats[other+"|"+id]||0;
-   if(forward||reverse) score += forward-reverse;
- }
- return score;
+function pairwiseLearningScore(id,store,selectedIds){
+  const stats=state.orderStatsByStore[store]||{}; let score=0;
+  for(const other of selectedIds){if(other===id)continue;score+=(stats[id+"|"+other]||0)-(stats[other+"|"+id]||0)}
+  return score;
 }
 function sortedSelectedByStore(store){
- const selected=state.items.filter(x=>x.selected&&(x.shopStore||x.store||"PAK'nSAVE")===store);
- const learned=state.lastRoutesByStore[store]&&state.lastRoutesByStore[store].length
-   ? state.lastRoutesByStore[store]
-   : (state.routesByStore[store]||[]);
- const lastPos=new Map(learned.map((id,i)=>[id,i]));
- return selected.sort((a,b)=>{
-   // Primary sort: cumulative evidence from all completed shopping trips.
-   const as=pairwiseLearningScore(a.id,store,selected.map(x=>x.id));
-   const bs=pairwiseLearningScore(b.id,store,selected.map(x=>x.id));
-   if(as!==bs)return bs-as;
-   // Only use the latest route to break a genuine cumulative tie.
-   const ap=lastPos.has(a.id)?lastPos.get(a.id):Number.POSITIVE_INFINITY;
-   const bp=lastPos.has(b.id)?lastPos.get(b.id):Number.POSITIVE_INFINITY;
-   if(ap!==bp)return ap-bp;
-   return a.name.localeCompare(b.name,undefined,{sensitivity:"base"});
- });
+  const selected=state.items.filter(x=>x.selected&&(x.shopStore||x.store||"PAK'nSAVE")===store);
+  const learned=state.lastRoutesByStore[store]&&state.lastRoutesByStore[store].length?state.lastRoutesByStore[store]:(state.routesByStore[store]||[]);
+  const lastPos=new Map(learned.map((id,i)=>[id,i])); const ids=selected.map(x=>x.id);
+  return selected.sort((a,b)=>{
+    const as=pairwiseLearningScore(a.id,store,ids),bs=pairwiseLearningScore(b.id,store,ids); if(as!==bs)return bs-as;
+    const ap=lastPos.has(a.id)?lastPos.get(a.id):Infinity,bp=lastPos.has(b.id)?lastPos.get(b.id):Infinity; if(ap!==bp)return ap-bp;
+    return a.name.localeCompare(b.name,undefined,{sensitivity:"base"});
+  });
 }
-function selectedStores(){
- return [...new Set(state.items.filter(x=>x.selected).map(x=>x.shopStore||x.store||"PAK'nSAVE"))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
-}
-function ensureStore(store){
- store=(store||"PAK'nSAVE").trim()||"PAK'nSAVE";
- if(!state.stores.includes(store))state.stores.push(store);
- if(!state.routesByStore[store])state.routesByStore[store]=[];
- if(!state.pairsByStore[store])state.pairsByStore[store]={};
- return store;
-}
-function recordBuy(id){
- const it=state.items.find(x=>x.id===id); if(!it||it.bought)return;
- const store=ensureStore(it.shopStore||it.store);
- if(!state.shopStarted)state.shopStarted=Date.now();
- const route=state.routesByStore[store];
- const pairs=state.pairsByStore[store];
- const prev=route[route.length-1];
- if(prev&&prev!==id){const k=prev+"|"+id;pairs[k]=(pairs[k]||0)+1}
- route.push(id);
- it.bought=true;
- // When the whole weekly shop is finished, convert each store's completed
- // route into cumulative pairwise evidence. This makes the app learn from
- // repeated behaviour rather than simply copying the latest trip.
- const remaining=state.items.some(x=>x.selected&&!x.bought);
- if(!remaining){
-   for(const [st,r] of Object.entries(state.routesByStore||{})){
-     if(!Array.isArray(r) || !r.length)continue;
-     if(!state.orderStatsByStore[st])state.orderStatsByStore[st]={};
-     const stats=state.orderStatsByStore[st];
-     for(let i=0;i<r.length;i++){
-       for(let j=i+1;j<r.length;j++){
-         if(r[i]===r[j])continue;
-         const k=r[i]+"|"+r[j];
-         stats[k]=(stats[k]||0)+1;
-       }
-     }
-     state.lastRoutesByStore[st]=[...r];
-   }
-   // The weekly shop is finished. Clear the week's checkmarks automatically
-   // so the Master List is ready for the next selection. Route-learning
-   // history is preserved in orderStatsByStore and lastRoutesByStore.
-   state.items.forEach(x=>{
-     if(x.selected && x.bought){
-       x.selected=false;
-       x.bought=false;
-     }
-   });
-   // Reset only in-progress trip data; never erase learned history.
-   state.routesByStore={};
-   state.route=[];
-   state.shopStarted=null;
- }
- save();render();
-}
-function render(){
- const app=document.getElementById("app");
- if(window.view==="master") renderMaster(app);
- else if(window.view==="route") renderRoute(app);
- else renderShop(app);
-}
-function renderShop(app){
- const allSel=state.items.filter(x=>x.selected);
- const bought=allSel.filter(x=>x.bought).length;
- const sel=allSel.filter(x=>!x.bought);
- const stores=[...new Set(sel.map(x=>x.shopStore||x.store||"PAK'nSAVE"))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
- app.innerHTML=`<div class="stats"><div class="stat"><b>${allSel.length}</b>Items</div><div class="stat"><b>${bought}</b>Bought</div><div class="stat"><b>${sel.length}</b>Left</div></div>
- <div class="bar"><input id="search" placeholder="Search this week's shop…"><button class="primary" onclick="openAdd()">Add</button></div>
- <div class="bar"><button class="secondary" onclick="selectAll(false)">Clear shop</button><button class="secondary" onclick="resetBought()">New trip</button></div>
- ${sel.length?stores.map(store=>{const items=sortedSelectedByStore(store).filter(x=>!x.bought);return items.length?`<div class="section"><h2>${esc(store)}</h2>${items.map(itemCard).join("")}</div>`:""}).join(""):`<div class="empty">${allSel.length?"All items bought! 🎉<br><br>Tap <b>New trip</b> to restore this week's list, or go to <b>Master List</b> to add more items.":"Your weekly shop is empty.<br><br>Go to <b>Master List</b> and tap items to add them."}</div>`}`;
- document.getElementById("search").oninput=e=>filterCards(e.target.value);
-}
-function itemCard(x){
- return `<div class="card item-card" data-name="${esc((x.name+" "+(x.shopStore||x.store||"PAK'nSAVE")).toLowerCase())}"><div class="row">
- <button class="buy ${x.bought?"done":""}" onclick="buy('${esc(x.id)}')">${x.bought?"✓":"○"}</button>
- <button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.category)}</div><div class="storetag">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div></button>
- </div></div>`;
-}
-function renderMaster(app){
- const groups={};
- state.items.forEach(x=>(groups[x.category]??=[]).push(x));
- const orderedGroups=categoryList().map(cat=>[cat,(groups[cat]||[]).sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}))]);
- app.innerHTML=`<div class="bar"><input id="search" placeholder="Search master list…"><button class="primary" onclick="openAdd()">Add Item</button></div>
- <div class="bar"><button class="secondary" onclick="openStoreManager()">＋ Add Store</button><button class="secondary" onclick="addCategory()">＋ Add Category</button></div>
- <p class="muted">Tap an item to include it in this week's shop. Tap an item name to set quantity and store.</p>
- ${orderedGroups.map(([cat,arr])=>`<div class="section"><h2>${esc(cat)}</h2>${arr.length?arr.map(x=>`<div class="card item-card" data-name="${esc(x.name.toLowerCase())}"><div class="row">
- <button class="buy ${x.selected?"done":""}" onclick="toggleSelect('${esc(x.id)}')">${x.selected?"✓":"+"}</button>
- <button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div><div class="storetag">Tap item to set quantity & store</div></button>
- <button class="secondary" onclick="editItem('${esc(x.id)}')">Edit</button>
-  <button class="secondary" onclick="deleteItem('${esc(x.id)}')">Delete</button>
- </div></div>`).join(""):`<div class="muted">No items in this category yet.</div>`}</div>`).join("")}`;
- document.getElementById("search").oninput=e=>filterCards(e.target.value);
-}
-function renderRoute(app){
- const storeSet=new Set(state.stores||[]);
- Object.keys(state.lastRoutesByStore||{}).forEach(st=>storeSet.add(st));
- Object.keys(state.routesByStore||{}).forEach(st=>storeSet.add(st));
- state.items.filter(x=>x.selected).forEach(x=>storeSet.add(x.shopStore||x.store||"PAK'nSAVE"));
- const stores=[...storeSet].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
- const sections=stores.length?stores.map(store=>{
-   const selected=sortedSelectedByStore(store);
-   const route=(state.lastRoutesByStore[store]&&state.lastRoutesByStore[store].length) ? state.lastRoutesByStore[store] : (state.routesByStore[store]||[]);
-   const suggestion=selected.length?selected.map((x,i)=>`${i+1}. ${esc(x.name)}`).join("<br>"):"Select items in Master List for your next shop.";
-   return `<div class="card"><b>${esc(store)}</b><p class="muted">Latest recorded trip</p><p>${route.length?route.map((id,i)=>`${i+1}. ${esc(state.items.find(x=>x.id===id)?.name||id)}`).join("<br>"):"No shopping trip recorded yet."}</p><p class="muted">Current suggested order</p><p>${suggestion}</p></div>`;
- }).join(""):`<div class="card"><p>Add a store or select items in Master List to begin learning a route.</p></div>`;
- app.innerHTML=`<div class="card"><b>How route learning works</b><p class="muted">The app learns your shopping order separately for each store. Just tap ✓ as you shop. PAK'nSAVE, Woolworths and each specialty store can develop their own route without mixing them together.</p></div>${sections}<button class="primary" onclick="clearRoute()">Clear learned routes</button>`;
-}
+function ensureStore(store){store=(store||"PAK'nSAVE").trim()||"PAK'nSAVE";if(!state.stores.includes(store))state.stores.push(store);if(!state.routesByStore[store])state.routesByStore[store]=[];if(!state.pairsByStore[store])state.pairsByStore[store]={};if(!state.orderStatsByStore[store])state.orderStatsByStore[store]={};return store}
 function filterCards(q){q=q.toLowerCase();document.querySelectorAll(".item-card").forEach(c=>c.style.display=c.dataset.name.includes(q)?"":"none")}
-function toggleSelect(id){const x=state.items.find(x=>x.id===id);x.selected=!x.selected;x.bought=false;if(x.selected&&!x.shopStore)x.shopStore=x.store||"PAK'nSAVE";save();render()}
-function selectAll(v){state.items.forEach(x=>{if(!v)x.selected=false;x.bought=false});save();render()}
-function setQty(id,v){const x=state.items.find(x=>x.id===id);x.shopQty=v;x.usualQty=v;save()}
-function setUnit(id,v){const x=state.items.find(x=>x.id===id);x.shopUnit=v;x.usualUnit=v;save()}
-function setShopStore(id,v){const x=state.items.find(x=>x.id===id);if(!x)return;const store=ensureStore(v);x.shopStore=store;x.bought=false;save();render()}
-function buy(id){recordBuy(id)}
-function resetBought(){
-  // Restore the most recently completed shop without deleting cumulative
-  // learning or the latest completed routes.
-  const restore=new Set(Object.values(state.lastRoutesByStore||{}).flat());
-  if(!restore.size){
-    alert("There is no completed shop to restore yet.");
-    return;
-  }
-  state.items.forEach(x=>{
-    if(restore.has(x.id)){
-      x.selected=true;
-      x.bought=false;
-    }else{
-      x.bought=false;
-    }
-  });
-  state.routesByStore={};
-  state.route=[];
-  state.shopStarted=null;
-  save();
-  render();
-}
-function clearRoute(){if(confirm("Clear all learned store routes? Your Master List, stores and quantities will stay.")){state.routesByStore={};state.pairsByStore={};state.orderStatsByStore={};state.lastRoutesByStore={};state.route=[];state.pairs={};save();render()}}
-function editItem(id){
-  const x=state.items.find(x=>x.id===id);
-  if(!x)return;
-  document.getElementById("sheet").innerHTML=`
-    <h2>Edit item</h2>
-    <input id="eiName" value="${esc(x.name)}">
-    <select id="eiCat">
-      ${categoryList().map(c=>`<option ${c===x.category?"selected":""}>${esc(c)}</option>`).join("")}
-    </select>
-    <label class="muted">Store</label>
-    <select id="eiStore" onchange="if(this.value==='__ADD_STORE__'){addStoreFromField('eiStore')}" >
-      ${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st===(x.store||"PAK'nSAVE")?"selected":""}>${esc(st)}</option>`).join("")}
-      <option value="__ADD_STORE__">＋ Add new store…</option>
-    </select>
-    <button class="secondary" type="button" onclick="addStoreFromField('eiStore')">＋ Add new store</button>
-    <input id="eiQty" type="number" min="0" step="any" value="${esc(x.usualQty)}">
-    <select id="eiUnit">
-      ${["each","bunch","kg","g","pack","bag","box","tin","jar","tub","bottle","loaf","tube","roll","pair","dozen","litre","ml"].map(u=>`<option ${u===x.usualUnit?"selected":""}>${u}</option>`).join("")}
-    </select>
-    <div class="actions">
-      <button class="secondary" onclick="closeModal()">Cancel</button>
-      <button class="primary" onclick="saveEdit('${esc(id)}')">Save</button>
-    </div>`;
-  openModal();
-}
-function saveEdit(id){
-  const x=state.items.find(x=>x.id===id);
-  if(!x)return;
-  x.name=document.getElementById("eiName").value.trim()||x.name;
-  x.category=document.getElementById("eiCat").value;
-  const editStoreValue=document.getElementById("eiStore").value;
-  if(editStoreValue!=="__ADD_STORE__") { x.store=ensureStore(editStoreValue); x.shopStore=x.store; }
-  x.usualQty=document.getElementById("eiQty").value;
-  x.shopQty=x.usualQty;
-  x.usualUnit=document.getElementById("eiUnit").value;
-  x.shopUnit=x.usualUnit;
-  save();closeModal();render();
-}
-function deleteItem(id){
-  const x=state.items.find(x=>x.id===id);
-  if(!x)return;
-  if(confirm(`Delete "${x.name}" from the Master List?`)){
-    state.items=state.items.filter(i=>i.id!==id);
-    state.route=state.route.filter(i=>i!==id);
-    for(const k of Object.keys(state.pairs)){
-      if(k.startsWith(id+"|")||k.endsWith("|"+id)) delete state.pairs[k];
-    }
-    save();render();
-  }
-}
-function addStoreFromField(fieldId){
-  const field=document.getElementById(fieldId);
-  const current=field && field.value!=="__ADD_STORE__" ? field.value : "";
-  const name=prompt("Enter the new store name:","");
-  if(name===null)return;
-  const clean=name.trim();
-  if(!clean){alert("Please enter a store name.");return;}
-  const existing=state.stores.find(st=>st.toLowerCase()===clean.toLowerCase());
-  if(existing){
-    ensureStore(existing);
-    if(field){
-      rebuildStoreSelect(fieldId,existing);
-    }
-    save();
-    return;
-  }
-  ensureStore(clean);
-  save();
-  rebuildStoreSelect(fieldId,clean);
-}
-function rebuildStoreSelect(fieldId,selected){
-  const field=document.getElementById(fieldId);
-  if(!field || field.tagName!=="SELECT")return;
-  const stores=state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
-  field.innerHTML=stores.map(st=>`<option value="${esc(st)}" ${st===selected?"selected":""}>${esc(st)}</option>`).join("")+`<option value="__ADD_STORE__">＋ Add new store…</option>`;
-  field.value=selected;
-}
-
-function openStoreManager(){
-  const stores=[...state.stores].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
-  document.getElementById("sheet").innerHTML=`
-    <h2>Manage stores</h2>
-    <p class="muted">Add the places you shop. These stores will appear when you tap an item to set its amount and store.</p>
-    <div class="store-list">
-      ${stores.map(st=>`<div class="store-row"><span>${esc(st)}</span>${state.stores.length>1?`<button class="secondary" onclick="renameStore('${esc(st)}')">Rename</button><button class="secondary" onclick="deleteStore('${esc(st)}')">Delete</button>`:""}</div>`).join("")}
-    </div>
-    <div class="store-add">
-      <input id="newStoreName" placeholder="New store name" autocomplete="off">
-      <button class="primary" onclick="addStore()">Add store</button>
-    </div>
-    <div class="actions"><button class="secondary" onclick="closeModal()">Done</button></div>`;
-  openModal();
-  setTimeout(()=>document.getElementById("newStoreName")?.focus(),50);
-}
-function addStore(){
-  const input=document.getElementById("newStoreName");
-  const name=(input?.value||"").trim();
-  if(!name){alert("Please enter a store name.");return;}
-  const existing=state.stores.find(st=>st.toLowerCase()===name.toLowerCase());
-  if(existing){alert("That store already exists.");return;}
-  ensureStore(name);
-  save();
-  openStoreManager();
-}
-function renameStore(oldName){
-  const current=state.stores.find(st=>st===oldName);
-  if(!current)return;
-  const next=prompt("Rename store:",current);
-  if(next===null)return;
-  const name=next.trim();
-  if(!name||name===current)return;
-  if(state.stores.some(st=>st.toLowerCase()===name.toLowerCase())){alert("That store already exists.");return;}
-  state.stores=state.stores.map(st=>st===current?name:st);
-  if(state.routesByStore[current]){state.routesByStore[name]=state.routesByStore[current];delete state.routesByStore[current]}
-  if(state.pairsByStore[current]){state.pairsByStore[name]=state.pairsByStore[current];delete state.pairsByStore[current]}
-  if(state.orderStatsByStore[current]){state.orderStatsByStore[name]=state.orderStatsByStore[current];delete state.orderStatsByStore[current]}
-  if(state.lastRoutesByStore[current]){state.lastRoutesByStore[name]=state.lastRoutesByStore[current];delete state.lastRoutesByStore[current]}
-  state.items.forEach(x=>{
-    if(x.store===current)x.store=name;
-    if(x.shopStore===current)x.shopStore=name;
-  });
-  save();
-  openStoreManager();
-}
-function deleteStore(name){
-  if(state.stores.length<=1){alert("Keep at least one store.");return;}
-  const used=state.items.some(x=>x.store===name||x.shopStore===name);
-  if(used){alert(`"${name}" is currently assigned to one or more items. Reassign those items before deleting this store.`);return;}
-  if(!confirm(`Delete "${name}" from your store list?`))return;
-  state.stores=state.stores.filter(st=>st!==name);
-  delete state.routesByStore[name];
-  delete state.pairsByStore[name];
-  delete state.orderStatsByStore[name];
-  delete state.lastRoutesByStore[name];
-  save();
-  openStoreManager();
-}
-function addCategory(){
-  document.getElementById("sheet").innerHTML=`
-    <h2>Add category</h2>
-    <p class="muted">Create a new category for your Master List. For example: Pet.</p>
-    <label class="muted" for="newCategoryName">Category name</label>
-    <input id="newCategoryName" type="text" placeholder="e.g. Pet" autocomplete="off">
-    <div class="actions">
-      <button class="secondary" type="button" onclick="closeModal()">Cancel</button>
-      <button class="primary" type="button" onclick="saveNewCategory()">Add category</button>
-    </div>`;
-  openModal();
-  setTimeout(()=>document.getElementById("newCategoryName")?.focus(),50);
-}
-function saveNewCategory(){
-  const input=document.getElementById("newCategoryName");
-  const clean=(input?.value||"").trim();
-  if(!clean){alert("Please enter a category name.");input?.focus();return;}
-  const existing=state.categories.find(c=>c.toLowerCase()===clean.toLowerCase());
-  if(existing){alert("That category already exists.");input?.focus();return;}
-  state.categories.push(clean);
-  save();
-  closeModal();
-  render();
-}
-function openAdd(){
-  const cats=categoryList();
-  document.getElementById("sheet").innerHTML=`
-    <h2>Add item</h2>
-    <input id="aiName" placeholder="Item name" autocomplete="off">
-    <label class="muted">Store</label>
-    <select id="aiStore" onchange="if(this.value==='__ADD_STORE__'){addStoreFromField('aiStore')}" >
-      ${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st==="PAK'nSAVE"?"selected":""}>${esc(st)}</option>`).join("")}
-      <option value="__ADD_STORE__">＋ Add new store…</option>
-    </select>
-    <button class="secondary" type="button" onclick="addStoreFromField('aiStore')">＋ Add new store</button>
-    <select id="aiCat">
-      ${cats.map(c=>`<option ${c==="Other"?"selected":""}>${esc(c)}</option>`).join("")}
-    </select>
-    <input id="aiQty" type="number" min="0" step="any" value="1">
-    <select id="aiUnit">
-      ${["each","bunch","kg","g","pack","bag","box","tin","jar","tub","bottle","loaf","tube","roll","pair","dozen","litre","ml"].map(u=>`<option>${u}</option>`).join("")}
-    </select>
-    <div class="actions">
-      <button class="secondary" onclick="closeModal()">Cancel</button>
-      <button class="primary" onclick="addItem()">Add</button>
-    </div>`;
-  openModal();
-  setTimeout(()=>document.getElementById("aiName").focus(),50);
-}
-function addItem(){
-  const name=document.getElementById("aiName").value.trim();
-  const cat=document.getElementById("aiCat").value;
-  const storeValue=document.getElementById("aiStore").value;
-  const store=ensureStore(storeValue!=="__ADD_STORE__"?storeValue:"PAK'nSAVE");
-  const q=document.getElementById("aiQty").value;
-  const u=document.getElementById("aiUnit").value;
-  if(!name){alert("Please enter an item name.");return;}
-  if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){
-    alert("That item already exists.");
-    return;
-  }
-  state.items.push({
-    id:name,name,category:cat,store,shopStore:store,usualQty:q,usualUnit:u,
-    shopQty:q,shopUnit:u,selected:true,bought:false
-  });
-  save();closeModal();render();
-}
-function openShopItem(id){
-  const x=state.items.find(x=>x.id===id);
-  if(!x)return;
-  const currentStore=x.shopStore||x.store||"PAK'nSAVE";
-  document.getElementById("sheet").innerHTML=`
-    <h2>${esc(x.name)}</h2>
-    <p class="muted">Set what you want to buy this week.</p>
-    <label class="muted">Amount</label>
-    <input id="siQty" type="number" min="0" step="any" value="${esc(x.shopQty||x.usualQty||1)}">
-    <select id="siUnit">
-      ${["each","bunch","kg","g","pack","bag","box","tin","jar","tub","bottle","loaf","tube","roll","pair","dozen","litre","ml"].map(u=>`<option ${u===(x.shopUnit||x.usualUnit) ? "selected" : ""}>${u}</option>`).join("")}
-    </select>
-    <label class="muted">Store</label>
-    <select id="siStore" onchange="if(this.value==='__ADD_STORE__'){addStoreFromField('siStore')}" >
-      ${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st===currentStore?"selected":""}>${esc(st)}</option>`).join("")}
-      <option value="__ADD_STORE__">＋ Add new store…</option>
-    </select>
-    <button class="secondary" type="button" onclick="addStoreFromField('siStore')">＋ Add new store</button>
-    <div class="actions">
-      <button class="secondary" onclick="closeModal()">Cancel</button>
-      <button class="primary" onclick="saveShopItem('${esc(id)}')">Save</button>
-    </div>`;
-  openModal();
-}
-function saveShopItem(id){
-  const x=state.items.find(x=>x.id===id);
-  if(!x)return;
-  x.shopQty=document.getElementById("siQty").value||"1";
-  x.shopUnit=document.getElementById("siUnit").value;
-  const shopStoreValue=document.getElementById("siStore").value;
-  x.shopStore=ensureStore(shopStoreValue!=="__ADD_STORE__"?shopStoreValue:(x.shopStore||x.store||"PAK'nSAVE"));
-  x.selected=true;
-  x.bought=false;
-  save();closeModal();render();
-}
 function openModal(){document.getElementById("modal").classList.add("show")}
 function closeModal(){document.getElementById("modal").classList.remove("show")}
 document.getElementById("modal").onclick=e=>{if(e.target.id==="modal")closeModal()}
-document.getElementById("tabShop").onclick=()=>{window.view="shop";setTabs();render()}
-document.getElementById("tabMaster").onclick=()=>{window.view="master";setTabs();render()}
-document.getElementById("tabRoute").onclick=()=>{window.view="route";setTabs();render()}
-function setTabs(){document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));document.getElementById(window.view==="master"?"tabMaster":window.view==="route"?"tabRoute":"tabShop").classList.add("active")}
-window.view="shop";render();
-</script>
 
-<script>
-(() => {
-  // Family testing access code. Change this before wider distribution.
-  const FAMILY_ACCESS_CODE = "2580";
-  const ACCESS_KEY = "paknsave_family_access_granted";
+function render(){const app=document.getElementById("app");if(view==="master")renderMaster(app);else if(view==="route")renderRoute(app);else renderShop(app)}
+function renderShop(app){
+  const allSel=state.items.filter(x=>x.selected),bought=allSel.filter(x=>x.bought).length,sel=allSel.filter(x=>!x.bought);
+  const stores=[...new Set(sel.map(x=>x.shopStore||x.store||"PAK'nSAVE"))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
+  app.innerHTML=`<div class="stats"><div class="stat"><b>${allSel.length}</b>Items</div><div class="stat"><b>${bought}</b>Bought</div><div class="stat"><b>${sel.length}</b>Left</div></div>
+  <div class="bar"><input id="search" placeholder="Search this week's shop…"><button class="primary" onclick="openAdd()">Add</button></div>
+  <div class="bar"><button class="secondary" onclick="selectAll(false)">Clear shop</button><button class="secondary" onclick="resetBought()">New trip</button></div>
+  ${sel.length?stores.map(store=>{const items=sortedSelectedByStore(store).filter(x=>!x.bought);return items.length?`<div class="section"><h2>${esc(store)}</h2>${items.map(itemCard).join("")}</div>`:""}).join(""):`<div class="empty">${allSel.length?"All items bought! 🎉<br><br>Tap <b>New trip</b> to restore this week's list, or go to <b>Master List</b> to add more items.":"Your weekly shop is empty.<br><br>Go to <b>Master List</b> and tap items to add them."}</div>`}`;
+  document.getElementById("search").oninput=e=>filterCards(e.target.value);
+}
+function itemCard(x){return `<div class="card item-card" data-name="${esc((x.name+" "+(x.shopStore||x.store||"PAK'nSAVE")).toLowerCase())}"><div class="row"><button class="buy ${x.bought?"done":""}" onclick="buy('${esc(x.id)}')">${x.bought?"✓":"○"}</button><button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.category)}</div><div class="storetag">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div></button></div></div>`}
+function renderMaster(app){
+  const groups={}; state.items.forEach(x=>(groups[x.category]??=[]).push(x));
+  const ordered=categoryList().map(cat=>[cat,(groups[cat]||[]).sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}))]);
+  app.innerHTML=`<div class="bar"><input id="search" placeholder="Search master list…"><button class="primary" onclick="openAdd()">Add Item</button></div><div class="bar"><button class="secondary" onclick="openStoreManager()">＋ Add Store</button><button class="secondary" onclick="addCategory()">＋ Add Category</button></div><p class="muted">Tap an item to include it in this week's shop. Tap the item name to set amount and store.</p>${ordered.map(([cat,arr])=>`<div class="section"><h2>${esc(cat)}</h2>${arr.length?arr.map(x=>`<div class="card item-card" data-name="${esc(x.name.toLowerCase())}"><div class="row"><button class="buy ${x.selected?"done":""}" onclick="toggleSelect('${esc(x.id)}')">${x.selected?"✓":"+"}</button><button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div><div class="storetag">Tap item to set quantity & store</div></button><button class="secondary" onclick="editItem('${esc(x.id)}')">Edit</button><button class="secondary" onclick="deleteItem('${esc(x.id)}')">Delete</button></div></div>`).join(""):`<div class="muted">No items in this category yet.</div>`}</div>`).join("")}`; document.getElementById("search").oninput=e=>filterCards(e.target.value);
+}
+function renderRoute(app){
+  const storeSet=new Set(state.stores||[]);Object.keys(state.lastRoutesByStore||{}).forEach(st=>storeSet.add(st));Object.keys(state.routesByStore||{}).forEach(st=>storeSet.add(st));state.items.filter(x=>x.selected).forEach(x=>storeSet.add(x.shopStore||x.store||"PAK'nSAVE"));
+  const stores=[...storeSet].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
+  const sections=stores.map(store=>{const selected=sortedSelectedByStore(store),route=state.lastRoutesByStore[store]?.length?state.lastRoutesByStore[store]:(state.routesByStore[store]||[]),suggestion=selected.length?selected.map((x,i)=>`${i+1}. ${esc(x.name)}`).join("<br>"):"Select items in Master List for your next shop.";return `<div class="card"><b>${esc(store)}</b><p class="muted">Latest recorded trip</p><p>${route.length?route.map((id,i)=>`${i+1}. ${esc(state.items.find(x=>x.id===id)?.name||id)}`).join("<br>"):"No shopping trip recorded yet."}</p><p class="muted">Current suggested order</p><p>${suggestion}</p></div>`}).join("");
+  app.innerHTML=`<div class="card"><b>How route learning works</b><p class="muted">Grocery Route accumulates your actual shopping order separately for each store. Repeated ordering becomes stronger over time; the latest route is used only to break ties.</p></div>${sections}<button class="primary" onclick="clearRoute()">Clear learned routes</button>`;
+}
 
-  const lock = document.getElementById("access-lock");
-  const input = document.getElementById("access-code");
-  const button = document.getElementById("unlock-app");
-  const error = document.getElementById("access-error");
+function toggleSelect(id){const x=state.items.find(x=>x.id===id);if(!x)return;x.selected=!x.selected;x.bought=false;if(x.selected&&!x.shopStore)x.shopStore=x.store||"PAK'nSAVE";saveLocal();render();queueCloudSync()}
+function selectAll(v){state.items.forEach(x=>{if(!v)x.selected=false;x.bought=false});saveLocal();render();queueCloudSync()}
+function buy(id){
+  const it=state.items.find(x=>x.id===id);if(!it||it.bought)return;const store=ensureStore(it.shopStore||it.store);if(!state.shopStarted)state.shopStarted=Date.now();const route=state.routesByStore[store],prev=route[route.length-1];if(prev&&prev!==id){const k=prev+"|"+id;state.pairsByStore[store][k]=(state.pairsByStore[store][k]||0)+1}route.push(id);it.bought=true;
+  const remaining=state.items.some(x=>x.selected&&!x.bought);
+  if(!remaining){
+    const completed={};
+    for(const [st,r] of Object.entries(state.routesByStore||{})){if(!r?.length)continue;completed[st]=[...r];const stats=state.orderStatsByStore[st]??={};for(let i=0;i<r.length;i++)for(let j=i+1;j<r.length;j++)if(r[i]!==r[j])stats[r[i]+"|"+r[j]]=(stats[r[i]+"|"+r[j]]||0)+1;state.orderStatsByStore[st]=stats;state.lastRoutesByStore[st]=[...r]}
+    // Clear the completed week's checkmarks but keep the learned route history.
+    state.items.forEach(x=>{if(x.selected&&x.bought){x.selected=false;x.bought=false}});
+    state.routesByStore={};state.route=[];state.shopStarted=null;saveLocal();render();queueCloudSync();syncCompletedTrip(completed).catch(console.error);return;
+  }
+  saveLocal();render();queueCloudSync();
+}
+function resetBought(){
+  const restore=new Set(Object.values(state.lastRoutesByStore||{}).flat());if(!restore.size){alert("There is no completed shop to restore yet.");return};
+  state.items.forEach(x=>{if(restore.has(x.id)){x.selected=true;x.bought=false}else x.bought=false});state.routesByStore={};state.route=[];state.shopStarted=null;saveLocal();render();queueCloudSync();
+}
 
-  function unlock() {
-    if (input.value === FAMILY_ACCESS_CODE) {
-      localStorage.setItem(ACCESS_KEY, "1");
-      lock.classList.add("hidden");
-      document.body.style.overflow = "";
-    } else {
-      error.textContent = "Incorrect access code.";
-      input.select();
+function openShopItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;const current=x.shopStore||x.store||"PAK'nSAVE";document.getElementById("sheet").innerHTML=`<h2>${esc(x.name)}</h2><p class="muted">Set what you want to buy this week.</p><label class="muted">Amount</label><input id="siQty" type="number" min="0" step="any" value="${esc(x.shopQty||x.usualQty||1)}"><select id="siUnit">${UNITS.map(u=>`<option ${u===(x.shopUnit||x.usualUnit)?"selected":""}>${u}</option>`).join("")}</select><label class="muted">Store</label><select id="siStore" onchange="if(this.value==='__ADD_STORE__')addStoreFromField('siStore')">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st===current?"selected":""}>${esc(st)}</option>`).join("")}<option value="__ADD_STORE__">＋ Add new store…</option></select><button class="secondary" type="button" onclick="addStoreFromField('siStore')">＋ Add new store</button><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveShopItem('${esc(id)}')">Save</button></div>`;openModal()}
+function saveShopItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;x.shopQty=document.getElementById("siQty").value||"1";x.shopUnit=document.getElementById("siUnit").value;let v=document.getElementById("siStore").value;if(v==="__ADD_STORE__")v=x.shopStore||x.store||"PAK'nSAVE";x.shopStore=ensureStore(v);x.selected=true;x.bought=false;saveLocal();closeModal();render();queueCloudSync()}
+function openAdd(){const cats=categoryList();document.getElementById("sheet").innerHTML=`<h2>Add item</h2><input id="aiName" placeholder="Item name" autocomplete="off"><label class="muted">Store</label><select id="aiStore">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st==="PAK'nSAVE"?"selected":""}>${esc(st)}</option>`).join("")}<option value="__ADD_STORE__">＋ Add new store…</option></select><button class="secondary" type="button" onclick="addStoreFromField('aiStore')">＋ Add new store</button><select id="aiCat">${cats.map(c=>`<option ${c==="Other"?"selected":""}>${esc(c)}</option>`).join("")}</select><input id="aiQty" type="number" min="0" step="any" value="1"><select id="aiUnit">${UNITS.map(u=>`<option>${u}</option>`).join("")}</select><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="addItem()">Add</button></div>`;openModal();setTimeout(()=>document.getElementById("aiName")?.focus(),50)}
+function addItem(){const name=document.getElementById("aiName").value.trim();if(!name){alert("Please enter an item name.");return}if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){alert("That item already exists.");return}let store=document.getElementById("aiStore").value;if(store==="__ADD_STORE__")store="PAK'nSAVE";store=ensureStore(store);const cat=document.getElementById("aiCat").value,q=document.getElementById("aiQty").value,u=document.getElementById("aiUnit").value;state.items.push({id:name,name,category:cat,store,shopStore:store,usualQty:q,usualUnit:u,shopQty:q,shopUnit:u,selected:true,bought:false});saveLocal();closeModal();render();queueCloudSync()}
+function editItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;document.getElementById("sheet").innerHTML=`<h2>Edit item</h2><input id="eiName" value="${esc(x.name)}"><select id="eiCat">${categoryList().map(c=>`<option ${c===x.category?"selected":""}>${esc(c)}</option>`).join("")}</select><label class="muted">Store</label><select id="eiStore">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st===(x.store||"PAK'nSAVE")?"selected":""}>${esc(st)}</option>`).join("")}</select><button class="secondary" type="button" onclick="addStoreFromField('eiStore')">＋ Add new store</button><input id="eiQty" type="number" min="0" step="any" value="${esc(x.usualQty)}"><select id="eiUnit">${UNITS.map(u=>`<option ${u===x.usualUnit?"selected":""}>${u}</option>`).join("")}</select><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveEdit('${esc(id)}')">Save</button></div>`;openModal()}
+function saveEdit(id){
+  const x=state.items.find(x=>x.id===id); if(!x)return;
+  const oldName=x.name, newName=document.getElementById("eiName").value.trim();
+  if(!newName){alert("Please enter an item name.");return}
+  if(state.items.some(it=>it.id!==id&&it.name.toLowerCase()===newName.toLowerCase())){alert("That item name already exists.");return}
+  if(newName!==oldName){
+    for(const map of [state.routesByStore,state.pairsByStore,state.orderStatsByStore,state.lastRoutesByStore]){
+      for(const store of Object.keys(map)){
+        if(Array.isArray(map[store])) map[store]=map[store].map(v=>v===oldName?newName:v);
+        else if(map[store]&&typeof map[store]==='object'){
+          const next={};
+          for(const [k,v] of Object.entries(map[store])){
+            const nk=k.split("|").map(part=>part===oldName?newName:part).join("|");
+            next[nk]=v;
+          }
+          map[store]=next;
+        }
+      }
     }
   }
-
-  if (localStorage.getItem(ACCESS_KEY) === "1") {
-    lock.classList.add("hidden");
-  } else {
-    document.body.style.overflow = "hidden";
-    setTimeout(() => input.focus(), 100);
+  x.name=newName; x.id=newName; x.category=document.getElementById("eiCat").value;
+  x.store=ensureStore(document.getElementById("eiStore").value); x.shopStore=x.shopStore===oldName||!x.shopStore?x.store:x.shopStore;
+  x.usualQty=document.getElementById("eiQty").value||"1"; x.usualUnit=document.getElementById("eiUnit").value; x.shopQty=x.usualQty; x.shopUnit=x.usualUnit;
+  saveLocal(); closeModal(); render(); queueCloudSync();
+}
+function remoteHasData(remote){return remote.items.length>0||remote.categories.length>0||remote.stores.length>0||remote.routes.length>0||remote.pairs.length>0}
+async function seedRemoteFromLocal(){
+  setSyncStatus("Migrating local data…");
+  const uid=currentUser.id;
+  const catRows=state.categories.map((name,i)=>({user_id:uid,name,sort_order:i}));
+  const storeRows=state.stores.map((name,i)=>({user_id:uid,name,sort_order:i}));
+  let r=await db.from("categories").upsert(catRows,{onConflict:"user_id,name"});if(r.error)throw r.error;
+  r=await db.from("stores").upsert(storeRows,{onConflict:"user_id,name"});if(r.error)throw r.error;
+  const {data:cats,error:ce}=await db.from("categories").select("id,name").eq("user_id",uid);if(ce)throw ce;
+  const {data:stores,error:se}=await db.from("stores").select("id,name").eq("user_id",uid);if(se)throw se;
+  const catMap=Object.fromEntries(cats.map(x=>[x.name,x.id])),storeMap=Object.fromEntries(stores.map(x=>[x.name,x.id]));
+  const itemRows=state.items.map((x,i)=>({user_id:uid,name:x.name,category_id:catMap[x.category]||null,default_store_id:storeMap[x.store||"PAK'nSAVE"]||null,usual_quantity:Number(x.usualQty)||1,usual_unit:x.usualUnit||"each",sort_order:i}));
+  r=await db.from("master_items").upsert(itemRows,{onConflict:"user_id,name"});if(r.error)throw r.error;
+  await replaceCloudRoutes();
+  await syncOpenTrip();
+  setSyncStatus("Migration complete"); localDirty=false;
+}
+async function downloadIntoLocal(remote){
+  const uid=currentUser.id; const catById=Object.fromEntries(remote.categories.map(x=>[x.id,x.name])); const storeById=Object.fromEntries(remote.stores.map(x=>[x.id,x.name]));
+  state.categories=remote.categories.length?remote.categories.sort((a,b)=>a.sort_order-b.sort_order).map(x=>x.name):[...CATEGORIES];
+  state.stores=remote.stores.length?remote.stores.sort((a,b)=>a.sort_order-b.sort_order).map(x=>x.name):[...DEFAULT_STORES];
+  state.items=(remote.items||[]).sort((a,b)=>a.sort_order-b.sort_order).map(x=>({id:x.name,name:x.name,category:catById[x.category_id]||"Other",store:storeById[x.default_store_id]||"PAK'nSAVE",shopStore:storeById[x.default_store_id]||"PAK'nSAVE",usualQty:String(x.usual_quantity??1),usualUnit:x.usual_unit||"each",shopQty:String(x.usual_quantity??1),shopUnit:x.usual_unit||"each",selected:false,bought:false}));
+  // Restore most recent open shopping trip, if there is one.
+  const openTrip=(remote.trips||[]).find(t=>t.status==="open");
+  if(openTrip){const {data:tripItems,error}=await db.from("shopping_trip_items").select("item_name,quantity,unit,store_name,bought,route_position").eq("trip_id",openTrip.id).eq("user_id",uid);if(error)throw error;for(const row of (tripItems||[])){const x=state.items.find(i=>i.name===row.item_name);if(x){x.selected=true;x.bought=!!row.bought;x.shopQty=String(row.quantity);x.shopUnit=row.unit||x.shopUnit;x.shopStore=row.store_name||x.store}}}
+  state.orderStatsByStore={};for(const row of remote.pairs){state.orderStatsByStore[row.store_name]??={};state.orderStatsByStore[row.store_name][row.item_a_name+"|"+row.item_b_name]=row.observations}
+  state.lastRoutesByStore={};for(const row of remote.routes)state.lastRoutesByStore[row.store_name]=Array.isArray(row.route_items)?row.route_items:[];
+  state.routesByStore={};state.pairsByStore={};state.route=[];state.pairs={};state.shopStarted=null;
+  normalizeState();saveLocal();localDirty=false;
+}
+async function loadCloudOrMigrate(){
+  await ensureProfile(); const remote=await fetchRemoteState();
+  if(!remoteHasData(remote)){
+    if(hasLocalCustomData()){
+      const doMigrate=confirm("This device already has Grocery Route data, including your custom items/categories/stores and possibly route history. Migrate that data to the cloud now?");
+      if(doMigrate){await seedRemoteFromLocal();return} 
+    }
+    // New cloud account: create the standard starting list from the existing app.
+    await seedRemoteFromLocal();return;
   }
+  await downloadIntoLocal(remote);
+  setSyncStatus("Synced");
+}
+async function syncOpenTrip(){
+  const uid=currentUser.id; const selected=state.items.filter(x=>x.selected);
+  const {data:existing,error:e}=await db.from("shopping_trips").select("id").eq("user_id",uid).eq("status","open").order("created_at",{ascending:false}).limit(1);if(e)throw e;
+  if(!selected.length){if(existing?.[0]){const del=await db.from("shopping_trip_items").delete().eq("trip_id",existing[0].id).eq("user_id",uid);if(del.error)throw del.error;const upd=await db.from("shopping_trips").update({status:"completed",completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",existing[0].id).eq("user_id",uid);if(upd.error)throw upd.error}return}
+  let tripId=existing?.[0]?.id; if(!tripId){const ins=await db.from("shopping_trips").insert({user_id:uid,status:"open",started_at:new Date().toISOString()}).select("id").single();if(ins.error)throw ins.error;tripId=ins.data.id}
+  const d=await db.from("shopping_trip_items").delete().eq("trip_id",tripId).eq("user_id",uid);if(d.error)throw d.error;
+  const rows=selected.map((x,i)=>({trip_id:tripId,user_id:uid,master_item_id:null,item_name:x.name,quantity:Number(x.shopQty)||1,unit:x.shopUnit||"each",store_name:x.shopStore||x.store,bought:!!x.bought,bought_at:x.bought?new Date().toISOString():null,route_position:null}));
+  if(rows.length){const ins=await db.from("shopping_trip_items").insert(rows);if(ins.error)throw ins.error}
+}
+async function syncCompletedTrip(completed){
+  if(!currentUser)return;setSyncStatus("Saving completed shop…");
+  const uid=currentUser.id; const {data:open,error:e}=await db.from("shopping_trips").select("id,started_at").eq("user_id",uid).eq("status","open").order("created_at",{ascending:false}).limit(1);if(e)throw e;
+  const now=new Date().toISOString(); let tripId=open?.[0]?.id;
+  if(!tripId){const ins=await db.from("shopping_trips").insert({user_id:uid,status:"completed",started_at:now,completed_at:now}).select("id").single();if(ins.error)throw ins.error;tripId=ins.data.id}else{const up=await db.from("shopping_trips").update({status:"completed",completed_at:now,updated_at:now}).eq("id",tripId).eq("user_id",uid);if(up.error)throw up.error}
+  const routeRows=[];for(const [store,route] of Object.entries(completed))for(let i=0;i<route.length;i++)routeRows.push({trip_id:tripId,user_id:uid,item_name:state.items.find(x=>x.id===route[i])?.name||route[i],quantity:1,unit:"each",store_name:store,bought:true,bought_at:now,route_position:i+1});
+  const del=await db.from("shopping_trip_items").delete().eq("trip_id",tripId).eq("user_id",uid);if(del.error)throw del.error;if(routeRows.length){const ins=await db.from("shopping_trip_items").insert(routeRows);if(ins.error)throw ins.error}
+  await replaceCloudRoutes();setSyncStatus("Synced");
+}
+async function replaceCloudRoutes(){
+  const uid=currentUser.id; const del=await db.from("route_pairs").delete().eq("user_id",uid);if(del.error)throw del.error;
+  const pairRows=[];for(const [store,stats] of Object.entries(state.orderStatsByStore||{}))for(const [key,count] of Object.entries(stats||{})){const [a,b]=key.split("|");pairRows.push({user_id:uid,store_name:store,item_a_name:a,item_b_name:b,observations:count,last_observed_at:new Date().toISOString()})}
+  if(pairRows.length){const ins=await db.from("route_pairs").insert(pairRows);if(ins.error)throw ins.error}
+  const d=await db.from("latest_store_routes").delete().eq("user_id",uid);if(d.error)throw d.error;const routeRows=Object.entries(state.lastRoutesByStore||{}).map(([store,route])=>({user_id:uid,store_name:store,route_items:route,completed_at:new Date().toISOString()}));if(routeRows.length){const ins=await db.from("latest_store_routes").insert(routeRows);if(ins.error)throw ins.error}
+}
+async function syncMasterData(){
+  const uid=currentUser.id;
+  const cats=state.categories.map((name,i)=>({user_id:uid,name,sort_order:i}));let r=await db.from("categories").upsert(cats,{onConflict:"user_id,name"});if(r.error)throw r.error;
+  const stores=state.stores.map((name,i)=>({user_id:uid,name,sort_order:i}));r=await db.from("stores").upsert(stores,{onConflict:"user_id,name"});if(r.error)throw r.error;
+  // Remove cloud rows that no longer exist locally.
+  const {data:rcats,error:rc}=await db.from("categories").select("id,name").eq("user_id",uid);if(rc)throw rc;const deadCats=rc.filter(x=>!state.categories.some(c=>c===x.name));if(deadCats.length){r=await db.from("categories").delete().in("id",deadCats.map(x=>x.id));if(r.error)throw r.error}
+  const {data:rstores,error:rs}=await db.from("stores").select("id,name").eq("user_id",uid);if(rs)throw rs;const deadStores=rstores.filter(x=>!state.stores.some(s=>s===x.name));if(deadStores.length){r=await db.from("stores").delete().in("id",deadStores.map(x=>x.id));if(r.error)throw r.error}
+  const {data:cats2,error:ce}=await db.from("categories").select("id,name").eq("user_id",uid);if(ce)throw ce;const {data:stores2,error:se}=await db.from("stores").select("id,name").eq("user_id",uid);if(se)throw se;
+  const catMap=Object.fromEntries(cats2.map(x=>[x.name,x.id])),storeMap=Object.fromEntries(stores2.map(x=>[x.name,x.id]));
+  const rows=state.items.map((x,i)=>({user_id:uid,name:x.name,category_id:catMap[x.category]||null,default_store_id:storeMap[x.store||"PAK'nSAVE"]||null,usual_quantity:Number(x.usualQty)||1,usual_unit:x.usualUnit||"each",sort_order:i}));r=await db.from("master_items").upsert(rows,{onConflict:"user_id,name"});if(r.error)throw r.error;
+  const {data:ritems,error:ri}=await db.from("master_items").select("id,name").eq("user_id",uid);if(ri)throw ri;const deadItems=ritems.filter(x=>!state.items.some(i=>i.name===x.name));if(deadItems.length){r=await db.from("master_items").delete().in("id",deadItems.map(x=>x.id));if(r.error)throw r.error}
+  await syncOpenTrip();
+}
+async function syncToCloud(forceRoutes=false){if(!currentUser||!cloudReady||syncing)return;syncing=true;try{setSyncStatus("Syncing…");await syncMasterData();if(forceRoutes)await replaceCloudRoutes();localDirty=false;setSyncStatus("Synced")}catch(err){console.error(err);setSyncStatus("Sync error")}finally{syncing=false}}
+function queueCloudSync(forceRoutes=false){if(!currentUser||!cloudReady)return;clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(()=>syncToCloud(forceRoutes),400)}
 
-  button.addEventListener("click", unlock);
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") unlock();
-  });
-})();
+async function signIn(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(!email||!password){setAuthMsg("Enter your email and password.");return}setAuthMsg("Signing in…",false);const {data,error}=await db.auth.signInWithPassword({email,password});if(error){setAuthMsg(error.message);return}if(data.session){setAuthMsg("");await bootAuthenticated(data.user)}}
+async function signUp(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(!email||!password){setAuthMsg("Enter your email and password.");return}setAuthMsg("Creating account…",false);const {data,error}=await db.auth.signUp({email,password});if(error){setAuthMsg(error.message);return}if(data.session){setAuthMsg("");await bootAuthenticated(data.user)}else setAuthMsg("Account created. Check your email to confirm your account, then sign in.",false)}
+async function resetPassword(){const email=document.getElementById("authEmail").value.trim();if(!email){setAuthMsg("Enter your email address first.");return}const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});setAuthMsg(error?error.message:"If that email has an account, Supabase will send password-reset instructions.",!error)}
+async function bootAuthenticated(user){
+  currentUser=user;loadLocal();document.getElementById("userEmail").textContent=user.email||"";authVisible(false);setAuthMsg("");setSyncStatus("Connecting…");
+  try{await loadCloudOrMigrate();cloudReady=true;render();}catch(err){console.error(err);cloudReady=false;setSyncStatus("Cloud setup needed");render();alert("Grocery Route could not reach the Supabase tables. Check that the required tables are exposed in Supabase Data API settings.")}
+}
+async function signOut(){await db.auth.signOut();currentUser=null;cloudReady=false;authVisible(true);setAuthMsg("Signed out.",false)}
+
+document.getElementById("signInBtn").onclick=()=>signIn();document.getElementById("signUpBtn").onclick=()=>signUp();document.getElementById("resetBtn").onclick=()=>resetPassword();document.getElementById("signOutBtn").onclick=()=>signOut();
+["authEmail","authPassword"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{if(e.key==="Enter")signIn()}));
+document.getElementById("tabShop").onclick=()=>{view="shop";setTabs();render()};document.getElementById("tabMaster").onclick=()=>{view="master";setTabs();render()};document.getElementById("tabRoute").onclick=()=>{view="route";setTabs();render()};
+function setTabs(){document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));document.getElementById(view==="master"?"tabMaster":view==="route"?"tabRoute":"tabShop").classList.add("active")}
+
+db.auth.onAuthStateChange(async (_event,session)=>{if(session&&!currentUser){try{await bootAuthenticated(session.user)}catch(e){console.error(e)}}else if(!session&&currentUser){currentUser=null;cloudReady=false;authVisible(true)}});
+(async()=>{const {data}=await db.auth.getSession();if(data.session)await bootAuthenticated(data.session.user);else{loadLocal();authVisible(true)}})();
 </script>
-
-</body></html>
+</body>
+</html>
