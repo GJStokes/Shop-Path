@@ -172,19 +172,38 @@ function hasLocalCustomData(){
   return state.items.length!==BASE_ITEMS.length||extraStores||extraCats||extraItems||changedItems||Object.keys(state.lastRoutesByStore).length>0||Object.keys(state.orderStatsByStore).length>0;
 }
 function pairwiseLearningScore(id,store,selectedIds){
-  const stats=state.orderStatsByStore[store]||{}; let score=0;
-  for(const other of selectedIds){if(other===id)continue;score+=(stats[id+"|"+other]||0)-(stats[other+"|"+id]||0)}
-  return score;
+  const stats=state.orderStatsByStore[store]||{};
+  // Rank by pairwise majority wins rather than raw summed margins.
+  // This makes repeated ordering behaviour easier to interpret: if an item
+  // has been observed before another item more often than the reverse, it
+  // wins that comparison. Total wins determine the primary rank, with total
+  // winning margin as a secondary confidence signal.
+  let wins=0, margin=0;
+  for(const other of selectedIds){
+    if(other===id)continue;
+    const forward=Number(stats[id+"|"+other]||0);
+    const reverse=Number(stats[other+"|"+id]||0);
+    if(forward>reverse)wins++;
+    else if(forward===reverse && forward>0){}
+    margin += forward-reverse;
+  }
+  return {wins,margin};
+}
+function compareLearnedItems(a,b,store,lastPos,selectedIds){
+  const as=pairwiseLearningScore(a.id,store,selectedIds);
+  const bs=pairwiseLearningScore(b.id,store,selectedIds);
+  if(as.wins!==bs.wins)return bs.wins-as.wins;
+  if(as.margin!==bs.margin)return bs.margin-as.margin;
+  const ap=lastPos.has(a.id)?lastPos.get(a.id):Infinity;
+  const bp=lastPos.has(b.id)?lastPos.get(b.id):Infinity;
+  if(ap!==bp)return ap-bp;
+  return a.name.localeCompare(b.name,undefined,{sensitivity:"base"});
 }
 function sortedSelectedByStore(store){
   const selected=state.items.filter(x=>x.selected&&(x.shopStore||x.store||"PAK'nSAVE")===store);
   const learned=state.lastRoutesByStore[store]&&state.lastRoutesByStore[store].length?state.lastRoutesByStore[store]:(state.routesByStore[store]||[]);
   const lastPos=new Map(learned.map((id,i)=>[id,i])); const ids=selected.map(x=>x.id);
-  return selected.sort((a,b)=>{
-    const as=pairwiseLearningScore(a.id,store,ids),bs=pairwiseLearningScore(b.id,store,ids); if(as!==bs)return bs-as;
-    const ap=lastPos.has(a.id)?lastPos.get(a.id):Infinity,bp=lastPos.has(b.id)?lastPos.get(b.id):Infinity; if(ap!==bp)return ap-bp;
-    return a.name.localeCompare(b.name,undefined,{sensitivity:"base"});
-  });
+  return selected.sort((a,b)=>compareLearnedItems(a,b,store,lastPos,ids));
 }
 function ensureStore(store){store=(store||"PAK'nSAVE").trim()||"PAK'nSAVE";if(!state.stores.includes(store))state.stores.push(store);if(!state.routesByStore[store])state.routesByStore[store]=[];if(!state.pairsByStore[store])state.pairsByStore[store]={};if(!state.orderStatsByStore[store])state.orderStatsByStore[store]={};return store}
 function filterCards(q){q=q.toLowerCase();document.querySelectorAll(".item-card").forEach(c=>c.style.display=c.dataset.name.includes(q)?"":"none")}
