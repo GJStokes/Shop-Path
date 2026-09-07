@@ -75,6 +75,7 @@ let cloudSyncTimer=null;
 let cloudReady=false;
 let syncing=false;
 let localDirty=false;
+let deviceLocalDataAvailable=false;
 let view="shop";
 
 function freshState(){
@@ -118,6 +119,11 @@ function saveLocal(){localStorage.setItem(KEY,JSON.stringify(state));localDirty=
 function cloneState(value){return JSON.parse(JSON.stringify(value));}
 function migrationBackupKey(uid){return KEY+"-migration-backup-"+uid;}
 function migrationMarkerKey(uid){return KEY+"-migration-complete-"+uid;}
+function cloudSnapshotKey(uid){return KEY+"-cloud-snapshot-"+uid;}
+function stateSignature(snapshot){try{return JSON.stringify(snapshot||null);}catch(e){return "";}}
+function getCloudSnapshotSignature(uid){return localStorage.getItem(cloudSnapshotKey(uid));}
+function setCloudSnapshotSignature(uid,snapshot){try{localStorage.setItem(cloudSnapshotKey(uid),stateSignature(snapshot));}catch(e){console.warn(e);}}
+function localMatchesLastCloud(uid,snapshot){const sig=getCloudSnapshotSignature(uid);return !!sig&&sig===stateSignature(snapshot);}
 function backupLocalBeforeMigration(uid){
   const backup={savedAt:new Date().toISOString(),version:1,state:cloneState(state)};
   localStorage.setItem(migrationBackupKey(uid),JSON.stringify(backup));
@@ -284,7 +290,7 @@ function renderMaster(app){
   const groups={}; state.items.forEach(x=>(groups[x.category]??=[]).push(x));
   const ordered=categoryList().map(cat=>[cat,(groups[cat]||[]).sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}))]);
   const uid=currentUser?.id||"";
-  const migrationNotice = ((!hasMigrationCompleted(uid) && (hasLocalCustomData() || backupHasCustomData(uid))) || anyBackupHasCustomData()) ? `<div class="notice"><b>Device data found.</b> Your previous Shop Path data is available on this Mac. <button class="secondary" type="button" onclick="migrateNow()">Migrate this device</button></div>` : "";
+  const migrationNotice = ((!hasMigrationCompleted(uid) && (deviceLocalDataAvailable || backupHasCustomData(uid)))) ? `<div class="notice"><b>Device data found.</b> This device has Shop Path data that is not yet confirmed as synced to your cloud account. <button class="secondary" type="button" onclick="migrateNow()">Migrate this device</button></div>` : "";
   app.innerHTML=`${migrationNotice}<div class="bar"><input id="search" placeholder="Search master list…"><button class="primary" onclick="openAdd()">Add Item</button></div><div class="bar"><button class="secondary" onclick="openStoreManager()">＋ Add Store</button><button class="secondary" onclick="addCategory()">＋ Add Category</button></div><p class="muted">Tap an item to include it in this week's shop. Tap the item name to set amount and store.</p>${ordered.map(([cat,arr])=>`<div class="section"><h2>${esc(cat)}</h2>${arr.length?arr.map(x=>`<div class="card item-card" data-name="${esc(x.name.toLowerCase())}"><div class="row"><button class="buy ${x.selected?"done":""}" onclick="toggleSelect('${esc(x.id)}')">${x.selected?"✓":"+"}</button><button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div><div class="storetag">Tap item to set quantity & store</div></button><button class="secondary" onclick="editItem('${esc(x.id)}')">Edit</button><button class="secondary" onclick="deleteItem('${esc(x.id)}')">Delete</button></div></div>`).join(""):`<div class="muted">No items in this category yet.</div>`}</div>`).join("")}`; document.getElementById("search").oninput=e=>filterCards(e.target.value);
 }
 async function clearRoute(){
@@ -465,6 +471,8 @@ async function migrateOrMergeLocalData(remote){
   markMigrationCompleted(uid);
   saveLocal();
   localDirty=false;
+  setCloudSnapshotSignature(uid,state);
+  deviceLocalDataAvailable=false;
   setSyncStatus('Migration complete');
 }
 async function recoverMigrationBackup(remote){
@@ -502,8 +510,10 @@ async function migrateNow(){
 
 async function loadCloudOrMigrate(){
   await ensureProfile();
-  const remote=await fetchRemoteState();
   const uid=currentUser.id;
+  const localBeforeCloud=cloneState(state);
+  const hasMeaningfulLocalData=localHasAnythingBeyondFresh() || hasLocalCustomData();
+  const remote=await fetchRemoteState();
   // A previous migration attempt may have backed up the device data before a later
   // step failed. Recover that backup before allowing the cloud copy to replace it.
   if(!hasMigrationCompleted(uid)){
@@ -523,6 +533,8 @@ async function loadCloudOrMigrate(){
           markMigrationCompleted(uid);
           saveLocal();
           localDirty=false;
+          setCloudSnapshotSignature(uid,state);
+          deviceLocalDataAvailable=false;
           setSyncStatus('Migration complete');
         }
         return;
@@ -532,6 +544,7 @@ async function loadCloudOrMigrate(){
     }
   }
   if(hasMigrationCompleted(uid)){
+    deviceLocalDataAvailable=false;
     // A completed migration means the local device has already been merged into
     // the account. From this point forward the cloud copy is the shared source of
     // truth for this signed-in device.
@@ -539,7 +552,8 @@ async function loadCloudOrMigrate(){
     setSyncStatus('Synced');
     return;
   }
-  const localHasData=localHasAnythingBeyondFresh() || hasLocalCustomData();
+  const localHasData=hasMeaningfulLocalData && !localMatchesLastCloud(uid,localBeforeCloud);
+  deviceLocalDataAvailable=localHasData;
   if(!remoteHasData(remote)){
     if(localHasData){
       const doMigrate=confirm('Your existing Shop Path data is on this device. A secure local backup will be created before it is copied to the cloud. Continue with migration?');
@@ -570,6 +584,7 @@ async function downloadIntoLocal(remote){
   state.lastRoutesByStore={};for(const row of remote.routes)state.lastRoutesByStore[row.store_name]=Array.isArray(row.route_items)?row.route_items:[];
   state.routesByStore={};state.pairsByStore={};state.route=[];state.pairs={};state.shopStarted=null;
   normalizeState();saveLocal();localDirty=false;
+  setCloudSnapshotSignature(uid,state);
 }
 async function ensureProfile(){
   if(!currentUser) throw new Error("No authenticated user");
@@ -682,7 +697,7 @@ async function syncMasterData(){
 
   await syncOpenTrip();
 }
-async function syncToCloud(forceRoutes=false){if(!currentUser||!cloudReady||syncing)return;syncing=true;try{setSyncStatus("Syncing…");await syncMasterData();if(forceRoutes)await replaceCloudRoutes();localDirty=false;setSyncStatus("Synced")}catch(err){console.error(err);setSyncStatus("Sync error")}finally{syncing=false}}
+async function syncToCloud(forceRoutes=false){if(!currentUser||!cloudReady||syncing)return;syncing=true;try{setSyncStatus("Syncing…");await syncMasterData();if(forceRoutes)await replaceCloudRoutes();localDirty=false;setCloudSnapshotSignature(currentUser.id,state);deviceLocalDataAvailable=false;setSyncStatus("Synced")}catch(err){console.error(err);setSyncStatus("Sync error")}finally{syncing=false}}
 function queueCloudSync(forceRoutes=false){if(!currentUser||!cloudReady)return;clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(()=>syncToCloud(forceRoutes),400)}
 
 async function signIn(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(!email||!password){setAuthMsg("Enter your email and password.");return}setAuthMsg("Signing in…",false);const {error}=await db.auth.signInWithPassword({email,password});if(error){setAuthMsg(error.message);return}setAuthMsg("Sign-in successful. Loading your Shop Path…",false)}
