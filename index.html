@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.webmanifest">
-<title>Grocery Route</title>
+<title>Shop Path</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f3f4f6;color:#111827}
 header{position:sticky;top:0;z-index:10;background:#111827;color:white;padding:14px 14px 10px;box-shadow:0 2px 10px #0002}
@@ -158,6 +158,64 @@ function sortedSelectedByStore(store){
 }
 function ensureStore(store){store=(store||"PAK'nSAVE").trim()||"PAK'nSAVE";if(!state.stores.includes(store))state.stores.push(store);if(!state.routesByStore[store])state.routesByStore[store]=[];if(!state.pairsByStore[store])state.pairsByStore[store]={};if(!state.orderStatsByStore[store])state.orderStatsByStore[store]={};return store}
 function filterCards(q){q=q.toLowerCase();document.querySelectorAll(".item-card").forEach(c=>c.style.display=c.dataset.name.includes(q)?"":"none")}
+function addStoreFromField(fieldId){
+  const field=document.getElementById(fieldId);
+  const name=prompt("Enter the new store name:",field&&field.value!=="__ADD_STORE__"?field.value:"");
+  if(name===null)return;
+  const clean=name.trim();
+  if(!clean){alert("Please enter a store name.");return;}
+  const existing=state.stores.find(st=>st.toLowerCase()===clean.toLowerCase());
+  ensureStore(existing||clean);
+  saveLocal();queueCloudSync();
+  if(field)rebuildStoreSelect(fieldId,existing||clean);
+}
+function rebuildStoreSelect(fieldId,selected){
+  const field=document.getElementById(fieldId);
+  if(!field||field.tagName!=="SELECT")return;
+  const stores=state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
+  field.innerHTML=stores.map(st=>`<option value="${esc(st)}" ${st===selected?"selected":""}>${esc(st)}</option>`).join("")+`<option value="__ADD_STORE__">＋ Add new store…</option>`;
+  field.value=selected;
+}
+function openStoreManager(){
+  const stores=state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
+  document.getElementById("sheet").innerHTML=`<h2>Manage stores</h2><p class="muted">Add, rename or delete the stores you shop at.</p><div class="store-list">${stores.map(st=>`<div class="store-row"><span>${esc(st)}</span><button class="secondary" onclick="renameStore('${esc(st)}')">Rename</button><button class="secondary" onclick="deleteStore('${esc(st)}')">Delete</button></div>`).join("")}</div><div class="store-add"><input id="newStoreName" placeholder="New store name" autocomplete="off"><button class="primary" onclick="addStore()">Add store</button></div><div class="actions"><button class="secondary" onclick="closeModal()">Done</button></div>`;
+  openModal();
+  setTimeout(()=>document.getElementById("newStoreName")?.focus(),50);
+}
+function addStore(){
+  const input=document.getElementById("newStoreName"); const name=(input?.value||"").trim();
+  if(!name){alert("Please enter a store name.");input?.focus();return;}
+  if(state.stores.some(st=>st.toLowerCase()===name.toLowerCase())){alert("That store already exists.");input?.focus();return;}
+  ensureStore(name);saveLocal();queueCloudSync();openStoreManager();
+}
+function renameStore(oldName){
+  const next=prompt("Rename store:",oldName); if(next===null)return; const name=next.trim();
+  if(!name||name===oldName)return;
+  if(state.stores.some(st=>st.toLowerCase()===name.toLowerCase())){alert("That store already exists.");return;}
+  state.stores=state.stores.map(st=>st===oldName?name:st);
+  for(const maps of [state.routesByStore,state.pairsByStore,state.orderStatsByStore,state.lastRoutesByStore]){if(maps[oldName]){maps[name]=maps[oldName];delete maps[oldName];}}
+  state.items.forEach(x=>{if(x.store===oldName)x.store=name;if(x.shopStore===oldName)x.shopStore=name;});
+  saveLocal();queueCloudSync(true);openStoreManager();
+}
+function deleteStore(name){
+  if(state.stores.length<=1){alert("Keep at least one store.");return;}
+  if(state.items.some(x=>x.store===name||x.shopStore===name)){alert(`"${name}" is assigned to one or more items. Reassign those items before deleting the store.`);return;}
+  if(!confirm(`Delete "${name}" from your store list?`))return;
+  state.stores=state.stores.filter(st=>st!==name);
+  delete state.routesByStore[name];delete state.pairsByStore[name];delete state.orderStatsByStore[name];delete state.lastRoutesByStore[name];
+  saveLocal();queueCloudSync(true);openStoreManager();
+}
+function addCategory(){
+  document.getElementById("sheet").innerHTML=`<h2>Add category</h2><p class="muted">Create a new category for your Master List. For example: Pet.</p><label class="muted" for="newCategoryName">Category name</label><input id="newCategoryName" type="text" placeholder="e.g. Pet" autocomplete="off"><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveNewCategory()">Add category</button></div>`;
+  openModal();
+  setTimeout(()=>document.getElementById("newCategoryName")?.focus(),50);
+}
+function saveNewCategory(){
+  const input=document.getElementById("newCategoryName"); const clean=(input?.value||"").trim();
+  if(!clean){alert("Please enter a category name.");input?.focus();return;}
+  if(state.categories.some(c=>c.toLowerCase()===clean.toLowerCase())){alert("That category already exists.");input?.focus();return;}
+  state.categories.push(clean);saveLocal();queueCloudSync();closeModal();render();
+}
 function openModal(){document.getElementById("modal").classList.add("show")}
 function closeModal(){document.getElementById("modal").classList.remove("show")}
 document.getElementById("modal").onclick=e=>{if(e.target.id==="modal")closeModal()}
@@ -176,7 +234,8 @@ function itemCard(x){return `<div class="card item-card" data-name="${esc((x.nam
 function renderMaster(app){
   const groups={}; state.items.forEach(x=>(groups[x.category]??=[]).push(x));
   const ordered=categoryList().map(cat=>[cat,(groups[cat]||[]).sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}))]);
-  app.innerHTML=`<div class="bar"><input id="search" placeholder="Search master list…"><button class="primary" onclick="openAdd()">Add Item</button></div><div class="bar"><button class="secondary" onclick="openStoreManager()">＋ Add Store</button><button class="secondary" onclick="addCategory()">＋ Add Category</button></div><p class="muted">Tap an item to include it in this week's shop. Tap the item name to set amount and store.</p>${ordered.map(([cat,arr])=>`<div class="section"><h2>${esc(cat)}</h2>${arr.length?arr.map(x=>`<div class="card item-card" data-name="${esc(x.name.toLowerCase())}"><div class="row"><button class="buy ${x.selected?"done":""}" onclick="toggleSelect('${esc(x.id)}')">${x.selected?"✓":"+"}</button><button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div><div class="storetag">Tap item to set quantity & store</div></button><button class="secondary" onclick="editItem('${esc(x.id)}')">Edit</button><button class="secondary" onclick="deleteItem('${esc(x.id)}')">Delete</button></div></div>`).join(""):`<div class="muted">No items in this category yet.</div>`}</div>`).join("")}`; document.getElementById("search").oninput=e=>filterCards(e.target.value);
+  const migrationNotice = (!hasMigrationCompleted(currentUser?.id||"") && hasLocalCustomData()) ? `<div class="notice"><b>Device data found.</b> Your previous Grocery Route data may still be on this Mac. <button class="secondary" type="button" onclick="migrateNow()">Migrate this device</button></div>` : "";
+  app.innerHTML=`${migrationNotice}<div class="bar"><input id="search" placeholder="Search master list…"><button class="primary" onclick="openAdd()">Add Item</button></div><div class="bar"><button class="secondary" onclick="openStoreManager()">＋ Add Store</button><button class="secondary" onclick="addCategory()">＋ Add Category</button></div><p class="muted">Tap an item to include it in this week's shop. Tap the item name to set amount and store.</p>${ordered.map(([cat,arr])=>`<div class="section"><h2>${esc(cat)}</h2>${arr.length?arr.map(x=>`<div class="card item-card" data-name="${esc(x.name.toLowerCase())}"><div class="row"><button class="buy ${x.selected?"done":""}" onclick="toggleSelect('${esc(x.id)}')">${x.selected?"✓":"+"}</button><button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div><div class="storetag">Tap item to set quantity & store</div></button><button class="secondary" onclick="editItem('${esc(x.id)}')">Edit</button><button class="secondary" onclick="deleteItem('${esc(x.id)}')">Delete</button></div></div>`).join(""):`<div class="muted">No items in this category yet.</div>`}</div>`).join("")}`; document.getElementById("search").oninput=e=>filterCards(e.target.value);
 }
 function renderRoute(app){
   const storeSet=new Set(state.stores||[]);Object.keys(state.lastRoutesByStore||{}).forEach(st=>storeSet.add(st));Object.keys(state.routesByStore||{}).forEach(st=>storeSet.add(st));state.items.filter(x=>x.selected).forEach(x=>storeSet.add(x.shopStore||x.store||"PAK'nSAVE"));
@@ -330,11 +389,27 @@ async function migrateOrMergeLocalData(remote){
   localDirty=false;
   setSyncStatus('Migration complete');
 }
+async function migrateNow(){
+  if(!currentUser)return;
+  try{
+    setSyncStatus("Preparing migration…");
+    const remote=await fetchRemoteState();
+    if(remoteHasData(remote)){
+      const ok=confirm("Your cloud account already has data. I will back up this device first, then merge this Mac's data into the cloud without deleting the device data. Continue?");
+      if(!ok){setSyncStatus("Migration cancelled");return;}
+      await migrateOrMergeLocalData(remote);
+    }else{
+      await seedRemoteFromLocal();
+    }
+    render();
+  }catch(err){console.error(err);setSyncStatus("Migration failed");alert(`Migration failed.\n\n${err?.message||String(err)}`)}
+}
+
 async function loadCloudOrMigrate(){
   await ensureProfile();
   const remote=await fetchRemoteState();
   const uid=currentUser.id;
-  if(hasMigrationCompleted(uid)){
+  if(hasMigrationCompleted(uid) && !hasLocalCustomData()){
     await downloadIntoLocal(remote);
     setSyncStatus('Synced');
     return;
@@ -404,19 +479,6 @@ async function fetchRemoteState(){
   };
 }
 
-async function loadCloudOrMigrate(){
-  await ensureProfile(); const remote=await fetchRemoteState();
-  if(!remoteHasData(remote)){
-    if(hasLocalCustomData()){
-      const doMigrate=confirm("This device already has Grocery Route data, including your custom items/categories/stores and possibly route history. Migrate that data to the cloud now?");
-      if(doMigrate){await seedRemoteFromLocal();return} 
-    }
-    // New cloud account: create the standard starting list from the existing app.
-    await seedRemoteFromLocal();return;
-  }
-  await downloadIntoLocal(remote);
-  setSyncStatus("Synced");
-}
 async function syncOpenTrip(){
   const uid=currentUser.id; const selected=state.items.filter(x=>x.selected);
   const {data:existing,error:e}=await db.from("shopping_trips").select("id").eq("user_id",uid).eq("status","open").order("created_at",{ascending:false}).limit(1);if(e)throw e;
