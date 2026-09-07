@@ -41,7 +41,7 @@ button{font:inherit}.primary{background:#111827;color:white;border:0;border-radi
 
 <div id="app-shell">
 <header>
-  <div class="topline"><h1>Shop Path</h1><span class="status" id="syncStatus">Cloud sync ready</span><span class="user-pill" id="userEmail"></span><button class="secondary" style="padding:6px 9px" id="signOutBtn">Sign out</button></div>
+  <div class="topline"><h1>Shop Path</h1><span class="status" id="syncStatus">Cloud sync ready</span><button class="secondary" style="padding:6px 9px" id="syncNowBtn">Sync now</button><span class="user-pill" id="userEmail"></span><button class="secondary" style="padding:6px 9px" id="signOutBtn">Sign out</button></div>
   <div class="tabs">
     <button class="tab active" id="tabShop">This Week</button>
     <button class="tab" id="tabMaster">Master List</button>
@@ -823,7 +823,36 @@ async function syncMasterData(){
 
   await syncOpenTrip();
 }
-async function syncToCloud(forceRoutes=false){if(!currentUser||!cloudReady||syncing)return;syncing=true;try{setSyncStatus("Syncing…");await syncMasterData();if(forceRoutes)await replaceCloudRoutes();localDirty=false;setCloudSnapshotSignature(currentUser.id,state);deviceLocalDataAvailable=false;setSyncStatus("Synced")}catch(err){console.error(err);setSyncStatus("Sync error")}finally{syncing=false}}
+async function syncToCloud(forceRoutes=false){if(!currentUser||!cloudReady||syncing)return false;syncing=true;try{setSyncStatus("Syncing…");await syncMasterData();if(forceRoutes)await replaceCloudRoutes();localDirty=false;setCloudSnapshotSignature(currentUser.id,state);deviceLocalDataAvailable=false;setSyncStatus("Synced");return true}catch(err){console.error(err);setSyncStatus("Sync error");return false}finally{syncing=false}}
+async function syncNow(){
+  if(!currentUser||!cloudReady||syncing)return;
+  syncing=true;
+  const btn=document.getElementById("syncNowBtn");
+  if(btn)btn.disabled=true;
+  try{
+    setSyncStatus("Syncing…");
+    // Never discard unsaved local changes. Push them first, then pull the
+    // authoritative cloud state back down so both devices converge.
+    if(localDirty){
+      await syncMasterData();
+      await replaceCloudRoutes();
+      localDirty=false;
+    }
+    const remote=await fetchRemoteState();
+    await downloadIntoLocal(remote);
+    setCloudSnapshotSignature(currentUser.id,state);
+    deviceLocalDataAvailable=false;
+    setSyncStatus("Synced");
+    render();
+  }catch(err){
+    console.error("Manual sync error:",err);
+    setSyncStatus("Sync error");
+    alert(`Sync failed.\n\n${err?.message||String(err)}`);
+  }finally{
+    syncing=false;
+    if(btn)btn.disabled=false;
+  }
+}
 function queueCloudSync(forceRoutes=false){if(!currentUser||!cloudReady)return;clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(()=>syncToCloud(forceRoutes),400)}
 
 async function signIn(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(!email||!password){setAuthMsg("Enter your email and password.");return}setAuthMsg("Signing in…",false);const {error}=await db.auth.signInWithPassword({email,password});if(error){setAuthMsg(error.message);return}setAuthMsg("Sign-in successful. Loading your Shop Path…",false)}
@@ -835,7 +864,7 @@ async function bootAuthenticated(user){
 }
 async function signOut(){await db.auth.signOut();currentUser=null;cloudReady=false;authVisible(true);setAuthMsg("Signed out.",false)}
 
-document.getElementById("signInBtn").onclick=()=>signIn();document.getElementById("signUpBtn").onclick=()=>signUp();document.getElementById("resetBtn").onclick=()=>resetPassword();document.getElementById("signOutBtn").onclick=()=>signOut();
+document.getElementById("signInBtn").onclick=()=>signIn();document.getElementById("signUpBtn").onclick=()=>signUp();document.getElementById("resetBtn").onclick=()=>resetPassword();document.getElementById("signOutBtn").onclick=()=>signOut();document.getElementById("syncNowBtn").onclick=()=>syncNow();
 ["authEmail","authPassword"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{if(e.key==="Enter")signIn()}));
 document.getElementById("tabShop").onclick=()=>{view="shop";setTabs();render()};document.getElementById("tabMaster").onclick=()=>{view="master";setTabs();render()};document.getElementById("tabRoute").onclick=()=>{view="route";setTabs();render()};
 function setTabs(){document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));document.getElementById(view==="master"?"tabMaster":view==="route"?"tabRoute":"tabShop").classList.add("active")}
