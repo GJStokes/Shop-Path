@@ -254,6 +254,39 @@ async function downloadIntoLocal(remote){
   state.routesByStore={};state.pairsByStore={};state.route=[];state.pairs={};state.shopStarted=null;
   normalizeState();saveLocal();localDirty=false;
 }
+async function ensureProfile(){
+  if(!currentUser) throw new Error("No authenticated user");
+  const uid=currentUser.id;
+  const {error}=await db.from("profiles").upsert({
+    id:uid,
+    display_name:currentUser.email||"",
+    updated_at:new Date().toISOString()
+  },{onConflict:"id"});
+  if(error) throw error;
+}
+
+async function fetchRemoteState(){
+  if(!currentUser) throw new Error("No authenticated user");
+  const uid=currentUser.id;
+  const [cats,stores,items,trips,pairs,routes]=await Promise.all([
+    db.from("categories").select("id,name,sort_order").eq("user_id",uid).order("sort_order",{ascending:true}),
+    db.from("stores").select("id,name,sort_order").eq("user_id",uid).order("sort_order",{ascending:true}),
+    db.from("master_items").select("id,name,category_id,default_store_id,usual_quantity,usual_unit,sort_order").eq("user_id",uid).order("sort_order",{ascending:true}),
+    db.from("shopping_trips").select("id,status,started_at,completed_at,created_at,updated_at").eq("user_id",uid).order("created_at",{ascending:false}),
+    db.from("route_pairs").select("id,store_name,item_a_name,item_b_name,observations,last_observed_at").eq("user_id",uid),
+    db.from("latest_store_routes").select("id,store_name,trip_id,route_items,completed_at").eq("user_id",uid)
+  ]);
+  for(const result of [cats,stores,items,trips,pairs,routes]) if(result.error) throw result.error;
+  return {
+    categories:cats.data||[],
+    stores:stores.data||[],
+    items:items.data||[],
+    trips:trips.data||[],
+    pairs:pairs.data||[],
+    routes:routes.data||[]
+  };
+}
+
 async function loadCloudOrMigrate(){
   await ensureProfile(); const remote=await fetchRemoteState();
   if(!remoteHasData(remote)){
@@ -307,12 +340,12 @@ async function syncMasterData(){
 async function syncToCloud(forceRoutes=false){if(!currentUser||!cloudReady||syncing)return;syncing=true;try{setSyncStatus("Syncing…");await syncMasterData();if(forceRoutes)await replaceCloudRoutes();localDirty=false;setSyncStatus("Synced")}catch(err){console.error(err);setSyncStatus("Sync error")}finally{syncing=false}}
 function queueCloudSync(forceRoutes=false){if(!currentUser||!cloudReady)return;clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(()=>syncToCloud(forceRoutes),400)}
 
-async function signIn(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(!email||!password){setAuthMsg("Enter your email and password.");return}setAuthMsg("Signing in…",false);const {data,error}=await db.auth.signInWithPassword({email,password});if(error){setAuthMsg(error.message);return}if(data.session){setAuthMsg("");await bootAuthenticated(data.user)}}
-async function signUp(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(!email||!password){setAuthMsg("Enter your email and password.");return}setAuthMsg("Creating account…",false);const {data,error}=await db.auth.signUp({email,password});if(error){setAuthMsg(error.message);return}if(data.session){setAuthMsg("");await bootAuthenticated(data.user)}else setAuthMsg("Account created. Check your email to confirm your account, then sign in.",false)}
+async function signIn(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(!email||!password){setAuthMsg("Enter your email and password.");return}setAuthMsg("Signing in…",false);const {error}=await db.auth.signInWithPassword({email,password});if(error){setAuthMsg(error.message);return}setAuthMsg("Sign-in successful. Loading your Grocery Route…",false)}
+async function signUp(){const email=document.getElementById("authEmail").value.trim(),password=document.getElementById("authPassword").value;if(!email||!password){setAuthMsg("Enter your email and password.");return}setAuthMsg("Creating account…",false);const {data,error}=await db.auth.signUp({email,password});if(error){setAuthMsg(error.message);return}if(data.session){setAuthMsg("Account created. Loading your Grocery Route…",false)}else setAuthMsg("Account created. Check your email to confirm your account, then sign in.",false)}
 async function resetPassword(){const email=document.getElementById("authEmail").value.trim();if(!email){setAuthMsg("Enter your email address first.");return}const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});setAuthMsg(error?error.message:"If that email has an account, Supabase will send password-reset instructions.",!error)}
 async function bootAuthenticated(user){
   currentUser=user;loadLocal();document.getElementById("userEmail").textContent=user.email||"";authVisible(false);setAuthMsg("");setSyncStatus("Connecting…");
-  try{await loadCloudOrMigrate();cloudReady=true;render();}catch(err){console.error(err);cloudReady=false;setSyncStatus("Cloud setup needed");render();alert("Grocery Route could not reach the Supabase tables. Check that the required tables are exposed in Supabase Data API settings.")}
+  try{await loadCloudOrMigrate();cloudReady=true;render();}catch(err){console.error("Supabase boot error:",err);cloudReady=false;setSyncStatus("Cloud setup needed");render();const code=err?.code?` [${err.code}]`:"";const msg=err?.message||String(err);alert(`Grocery Route could not complete cloud setup.${code}\n\n${msg}`)}
 }
 async function signOut(){await db.auth.signOut();currentUser=null;cloudReady=false;authVisible(true);setAuthMsg("Signed out.",false)}
 
