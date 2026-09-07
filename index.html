@@ -115,6 +115,16 @@ function normalizeState(){
   });
 }
 function saveLocal(){localStorage.setItem(KEY,JSON.stringify(state));localDirty=true;}
+function cloneState(value){return JSON.parse(JSON.stringify(value));}
+function migrationBackupKey(uid){return KEY+"-migration-backup-"+uid;}
+function migrationMarkerKey(uid){return KEY+"-migration-complete-"+uid;}
+function backupLocalBeforeMigration(uid){
+  const backup={savedAt:new Date().toISOString(),version:1,state:cloneState(state)};
+  localStorage.setItem(migrationBackupKey(uid),JSON.stringify(backup));
+  return backup;
+}
+function hasMigrationCompleted(uid){return localStorage.getItem(migrationMarkerKey(uid))!==null;}
+function markMigrationCompleted(uid){localStorage.setItem(migrationMarkerKey(uid),new Date().toISOString());}
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function categoryList(){return state.categories.slice()}
 function setSyncStatus(text){const el=document.getElementById("syncStatus");if(el)el.textContent=text}
@@ -225,21 +235,128 @@ function saveEdit(id){
   saveLocal(); closeModal(); render(); queueCloudSync();
 }
 function remoteHasData(remote){return remote.items.length>0||remote.categories.length>0||remote.stores.length>0||remote.routes.length>0||remote.pairs.length>0}
+function localHasAnythingBeyondFresh(){
+  if(!state)return false;
+  const fresh=freshState();
+  return JSON.stringify(state)!==JSON.stringify(fresh);
+}
+function mergeUniqueNames(primary,secondary){
+  const out=[]; const seen=new Set();
+  for(const name of [...(primary||[]),...(secondary||[])]){const n=String(name||'').trim();const key=n.toLowerCase();if(n&&!seen.has(key)){seen.add(key);out.push(n);}}
+  return out;
+}
+function mergeLocalIntoCurrent(localSnapshot){
+  const remoteState=cloneState(state);
+  const localState=cloneState(localSnapshot);
+  // Keep everything that exists in either source. Local data wins on same-item conflicts,
+  // because this migration is specifically protecting the existing device data.
+  state.categories=mergeUniqueNames(remoteState.categories,localState.categories);
+  state.stores=mergeUniqueNames(remoteState.stores,localState.stores);
+  const byName=new Map();
+  for(const item of remoteState.items||[])byName.set(String(item.name).toLowerCase(),cloneState(item));
+  for(const item of localState.items||[])byName.set(String(item.name).toLowerCase(),cloneState(item));
+  state.items=[...byName.values()];
+  state.items.forEach(x=>{
+    if(!x.store)x.store="PAK'nSAVE";
+    if(!x.shopStore)x.shopStore=x.store;
+    if(x.usualQty==null)x.usualQty='1'; if(!x.usualUnit)x.usualUnit='each';
+    if(x.shopQty==null)x.shopQty=x.usualQty; if(!x.shopUnit)x.shopUnit=x.usualUnit;
+    if(x.selected==null)x.selected=false; if(x.bought==null)x.bought=false;
+  });
+  const mergedStats={};
+  for(const source of [remoteState.orderStatsByStore,localState.orderStatsByStore]){
+    for(const [store,stats] of Object.entries(source||{})){mergedStats[store]??={};for(const [key,count] of Object.entries(stats||{})){mergedStats[store][key]=(mergedStats[store][key]||0)+Number(count||0);}}
+  }
+  state.orderStatsByStore=mergedStats;
+  const mergeObjectArrays=(a,b)=>{const out={};for(const src of [a,b])for(const [store,arr] of Object.entries(src||{})){if(Array.isArray(arr)&&arr.length)out[store]=cloneState(arr);}return out;};
+  state.lastRoutesByStore=mergeObjectArrays(remoteState.lastRoutesByStore,localState.lastRoutesByStore);
+  state.routesByStore=mergeObjectArrays(remoteState.routesByStore,localState.routesByStore);
+  const mergedPairs={};
+  for(const source of [remoteState.pairsByStore,localState.pairsByStore])for(const [store,pairs] of Object.entries(source||{})){mergedPairs[store]??={};for(const [key,count] of Object.entries(pairs||{}))mergedPairs[store][key]=Math.max(Number(mergedPairs[store][key]||0),Number(count||0));}
+  state.pairsByStore=mergedPairs;
+  state.route=localState.route?.length?cloneState(localState.route):cloneState(remoteState.route||[]);
+  state.pairs=localState.pairs&&Object.keys(localState.pairs).length?cloneState(localState.pairs):cloneState(remoteState.pairs||{});
+  state.shopStarted=localState.shopStarted||remoteState.shopStarted||null;
+  // For the current week's selection, preserve local choices but don't throw away
+  // an open cloud shopping trip that the other device may already have.
+  const remoteByName=Object.fromEntries((remoteState.items||[]).map(x=>[String(x.name).toLowerCase(),x]));
+  state.items.forEach(x=>{
+    const local=localState.items?.find(i=>String(i.name).toLowerCase()===String(x.name).toLowerCase());
+    const remote=remoteByName[String(x.name).toLowerCase()];
+    if(local?.selected){x.selected=true;x.bought=!!local.bought;x.shopQty=local.shopQty||x.shopQty;x.shopUnit=local.shopUnit||x.shopUnit;x.shopStore=local.shopStore||x.shopStore;}
+    else if(remote?.selected){x.selected=true;x.bought=!!remote.bought;x.shopQty=remote.shopQty||x.shopQty;x.shopUnit=remote.shopUnit||x.shopUnit;x.shopStore=remote.shopStore||x.shopStore;}
+  });
+  normalizeState();
+}
+async function verifyCloudMatchesLocal(){
+  const remote=await fetchRemoteState();
+  const catNames=new Set(remote.categories.map(x=>x.name.toLowerCase()));
+  const storeNames=new Set(remote.stores.map(x=>x.name.toLowerCase()));
+  const itemNames=new Set(remote.items.map(x=>x.name.toLowerCase()));
+  for(const c of state.categories)if(!catNames.has(c.toLowerCase()))throw new Error('Migration verification failed: missing category '+c);
+  for(const st of state.stores)if(!storeNames.has(st.toLowerCase()))throw new Error('Migration verification failed: missing store '+st);
+  for(const it of state.items)if(!itemNames.has(it.name.toLowerCase()))throw new Error('Migration verification failed: missing item '+it.name);
+  const remotePairs={};for(const row of remote.pairs){remotePairs[row.store_name+'|'+row.item_a_name+'|'+row.item_b_name]=Number(row.observations||0);}
+  for(const [store,stats] of Object.entries(state.orderStatsByStore||{}))for(const [key,count] of Object.entries(stats||{})){const [a,b]=key.split('|');const actual=remotePairs[store+'|'+a+'|'+b]||0;if(actual!==Number(count))throw new Error('Migration verification failed: route history mismatch');}
+  for(const [store,route] of Object.entries(state.lastRoutesByStore||{})){const actual=remote.routes.find(r=>r.store_name===store)?.route_items||[];if(JSON.stringify(actual)!==JSON.stringify(route))throw new Error('Migration verification failed: latest route mismatch for '+store);}
+  return remote;
+}
 async function seedRemoteFromLocal(){
-  setSyncStatus("Migrating local data…");
+  setSyncStatus('Migrating local data…');
   const uid=currentUser.id;
-  const catRows=state.categories.map((name,i)=>({user_id:uid,name,sort_order:i}));
-  const storeRows=state.stores.map((name,i)=>({user_id:uid,name,sort_order:i}));
-  let r=await db.from("categories").upsert(catRows,{onConflict:"user_id,name"});if(r.error)throw r.error;
-  r=await db.from("stores").upsert(storeRows,{onConflict:"user_id,name"});if(r.error)throw r.error;
-  const {data:cats,error:ce}=await db.from("categories").select("id,name").eq("user_id",uid);if(ce)throw ce;
-  const {data:stores,error:se}=await db.from("stores").select("id,name").eq("user_id",uid);if(se)throw se;
-  const catMap=Object.fromEntries(cats.map(x=>[x.name,x.id])),storeMap=Object.fromEntries(stores.map(x=>[x.name,x.id]));
-  const itemRows=state.items.map((x,i)=>({user_id:uid,name:x.name,category_id:catMap[x.category]||null,default_store_id:storeMap[x.store||"PAK'nSAVE"]||null,usual_quantity:Number(x.usualQty)||1,usual_unit:x.usualUnit||"each",sort_order:i}));
-  r=await db.from("master_items").upsert(itemRows,{onConflict:"user_id,name"});if(r.error)throw r.error;
+  backupLocalBeforeMigration(uid);
+  // Write all local master data and route history. The caller only uses this when the
+  // remote account is empty, so nothing existing in the cloud is overwritten.
+  await syncMasterData();
   await replaceCloudRoutes();
-  await syncOpenTrip();
-  setSyncStatus("Migration complete"); localDirty=false;
+  await verifyCloudMatchesLocal();
+  markMigrationCompleted(uid);
+  localDirty=false;
+  setSyncStatus('Migration complete');
+}
+async function migrateOrMergeLocalData(remote){
+  const uid=currentUser.id;
+  backupLocalBeforeMigration(uid);
+  const localSnapshot=cloneState(state);
+  if(remoteHasData(remote)){
+    await downloadIntoLocal(remote);
+    mergeLocalIntoCurrent(localSnapshot);
+  }
+  await syncMasterData();
+  await replaceCloudRoutes();
+  await verifyCloudMatchesLocal();
+  markMigrationCompleted(uid);
+  saveLocal();
+  localDirty=false;
+  setSyncStatus('Migration complete');
+}
+async function loadCloudOrMigrate(){
+  await ensureProfile();
+  const remote=await fetchRemoteState();
+  const uid=currentUser.id;
+  if(hasMigrationCompleted(uid)){
+    await downloadIntoLocal(remote);
+    setSyncStatus('Synced');
+    return;
+  }
+  const localHasData=localHasAnythingBeyondFresh() || hasLocalCustomData();
+  if(!remoteHasData(remote)){
+    if(localHasData){
+      const doMigrate=confirm('Your existing Grocery Route data is on this device. A secure local backup will be created before it is copied to the cloud. Continue with migration?');
+      if(doMigrate){await seedRemoteFromLocal();return}
+      throw new Error('Migration cancelled. Your local data has not been changed.');
+    }
+    await seedRemoteFromLocal();
+    return;
+  }
+  if(localHasData){
+    const doMerge=confirm('This device has existing Grocery Route data and your cloud account also has data. I will back up the device data first, then safely merge both sets of data without deleting either side. Continue?');
+    if(doMerge){await migrateOrMergeLocalData(remote);return}
+    await downloadIntoLocal(remote);
+    return;
+  }
+  await downloadIntoLocal(remote);
+  setSyncStatus('Synced');
 }
 async function downloadIntoLocal(remote){
   const uid=currentUser.id; const catById=Object.fromEntries(remote.categories.map(x=>[x.id,x.name])); const storeById=Object.fromEntries(remote.stores.map(x=>[x.id,x.name]));
