@@ -13,7 +13,7 @@ h1{font-size:20px;margin:0 0 10px}.tabs{display:flex;gap:6px}.tab{flex:1;border:
 main{max-width:760px;margin:auto;padding:12px 12px 100px}.bar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}.bar input{flex:1;min-width:180px;padding:12px;border:1px solid #d1d5db;border-radius:10px;font-size:16px}
 button{font:inherit}.primary{background:#111827;color:white;border:0;border-radius:10px;padding:12px 14px;font-weight:700}.secondary{background:white;border:1px solid #d1d5db;border-radius:10px;padding:10px 12px}
 .card{background:white;border-radius:14px;margin:8px 0;padding:12px;box-shadow:0 1px 4px #0001}.row{display:flex;align-items:center;gap:10px}.itemname{font-weight:700;flex:1}.cat{font-size:12px;color:#6b7280;margin-top:3px}
-.buy{width:42px;height:42px;border-radius:12px;border:2px solid #9ca3af;background:white;font-size:20px}.buy.done{background:#111827;color:white;border-color:#111827}.qty{display:flex;align-items:center;gap:5px}.qty input{width:54px;text-align:center;padding:7px;border:1px solid #d1d5db;border-radius:8px}.qty select{padding:7px;border:1px solid #d1d5db;border-radius:8px;background:white}
+.buy{width:42px;height:42px;border-radius:12px;border:2px solid #9ca3af;background:white;font-size:20px}.buy.done{background:#111827;color:white;border-color:#111827}.qty{display:flex;align-items:center;gap:5px}.qty input{width:54px;text-align:center;padding:7px;border:1px solid #d1d5db;border-radius:8px}.qty-stepper{display:flex;align-items:center;justify-content:center;gap:10px;margin:6px 0}.qty-stepper button{min-width:48px;min-height:46px;font-size:24px;line-height:1}.qty-stepper input{flex:1;max-width:120px;text-align:center;padding:11px;border:1px solid #d1d5db;border-radius:10px;font-size:18px}.qty select{padding:7px;border:1px solid #d1d5db;border-radius:8px;background:white}
 .section{margin-top:18px}.section h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}.storetag{font-size:12px;color:#374151;margin-top:3px;font-weight:600}.item-open{border:0;background:transparent;padding:0;text-align:left;cursor:pointer;flex:1}.item-open:active{opacity:.7}
 .muted{color:#6b7280;font-size:13px}.empty{padding:30px;text-align:center;color:#6b7280}.stats{display:flex;gap:8px;margin-bottom:10px}.stat{background:white;border-radius:12px;padding:10px;flex:1;text-align:center}.stat b{display:block;font-size:20px}
 .modal{position:fixed;inset:0;background:#0007;display:none;z-index:20;padding:18px}.modal.show{display:flex;align-items:flex-end}.sheet{background:white;border-radius:18px 18px 0 0;width:100%;max-height:85vh;overflow:auto;padding:16px}.sheet h2{margin-top:0}.sheet input,.sheet select{width:100%;padding:12px;margin:5px 0;border:1px solid #d1d5db;border-radius:10px;font-size:16px}.actions{display:flex;gap:8px;margin-top:10px}.actions button{flex:1}.store-list{margin:10px 0}.store-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #eee}.store-row span{flex:1;font-weight:600}.store-row button{padding:7px 10px}.store-add{display:flex;gap:8px;margin-top:12px}.store-add input{flex:1;margin:0}.store-add button{white-space:nowrap}.search-results{margin-top:18px}.search-results h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}
@@ -293,6 +293,82 @@ function saveNewCategory(){
   if(state.categories.some(c=>c.toLowerCase()===clean.toLowerCase())){alert("That category already exists.");input?.focus();return;}
   state.categories.push(clean);saveLocal();queueCloudSync();closeModal();render();
 }
+function openCategoryManager(){
+  const cats=state.categories.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
+  document.getElementById("sheet").innerHTML=`<h2>Manage categories</h2><p class="muted">Add, rename or delete your custom categories. Standard Shop Path categories cannot be deleted.</p><div class="store-list">${cats.map(cat=>{
+    const builtIn=CATEGORIES.some(c=>c.toLowerCase()===cat.toLowerCase());
+    const count=state.items.filter(x=>x.category===cat).length;
+    return `<div class="store-row"><span>${esc(cat)}${count?` <small class="muted">(${count} item${count===1?"":"s"})</small>`:""}</span>${builtIn?`<span class="muted">Standard</span>`:`<button class="secondary" onclick="renameCategory('${esc(cat)}')">Rename</button><button class="secondary" onclick="deleteCategory('${esc(cat)}')">Delete</button>`}</div>`;
+  }).join("")}</div><div class="store-add"><input id="manageCategoryName" placeholder="New category name" autocomplete="off"><button class="primary" onclick="saveManagedCategory()">Add category</button></div><div class="actions"><button class="secondary" onclick="closeModal()">Done</button></div>`;
+  openModal();
+  setTimeout(()=>document.getElementById("manageCategoryName")?.focus(),50);
+}
+function renameCategory(oldName){
+  const builtIn=CATEGORIES.some(c=>c.toLowerCase()===oldName.toLowerCase());
+  if(builtIn){alert("Standard Shop Path categories cannot be renamed.");return;}
+  const next=prompt("Rename category:",oldName);
+  if(next===null)return;
+  const name=next.trim();
+  if(!name||name===oldName)return;
+  if(state.categories.some(c=>c.toLowerCase()===name.toLowerCase())){alert("That category already exists.");return;}
+  (async()=>{
+    const snapshot=state.categories.slice();
+    state.categories=state.categories.map(c=>c===oldName?name:c);
+    state.items.forEach(x=>{if(x.category===oldName)x.category=name;});
+    saveLocal(); render();
+    try{
+      if(currentUser&&cloudReady){
+        const res=await db.from("categories").update({name,updated_at:new Date().toISOString()}).eq("user_id",currentUser.id).eq("name",oldName);
+        if(res.error)throw res.error;
+        await syncMasterData();
+      }
+      setSyncStatus("Synced");
+      openCategoryManager();
+      render();
+    }catch(err){
+      console.error("Rename category error:",err);
+      state.categories=snapshot;
+      state.items.forEach(x=>{if(x.category===name)x.category=oldName;});
+      saveLocal(); render();
+      alert(`Could not rename "${oldName}" in the cloud. The change has been reverted.\n\n${err?.message||String(err)}`);
+      setSyncStatus("Sync error");
+      openCategoryManager();
+    }
+  })();
+}
+function saveManagedCategory(){
+  const input=document.getElementById("manageCategoryName"); const clean=(input?.value||"").trim();
+  if(!clean){alert("Please enter a category name.");input?.focus();return;}
+  if(state.categories.some(c=>c.toLowerCase()===clean.toLowerCase())){alert("That category already exists.");input?.focus();return;}
+  state.categories.push(clean);saveLocal();queueCloudSync();openCategoryManager();render();
+}
+async function deleteCategory(name){
+  const builtIn=CATEGORIES.some(c=>c.toLowerCase()===name.toLowerCase());
+  if(builtIn){alert("Standard Shop Path categories cannot be deleted.");return;}
+  const assigned=state.items.filter(x=>x.category===name);
+  if(assigned.length){alert(`"${name}" contains ${assigned.length} item${assigned.length===1?"":"s"}. Reassign those items to another category before deleting it.`);return;}
+  if(!confirm(`Delete the category "${name}"?`))return;
+  state.categories=state.categories.filter(c=>c!==name);
+  saveLocal();
+  try{
+    if(currentUser&&cloudReady){
+      const uid=currentUser.id;
+      const res=await db.from("categories").delete().eq("user_id",uid).eq("name",name);
+      if(res.error)throw res.error;
+    }
+    setSyncStatus("Synced");
+    openCategoryManager();
+    render();
+  }catch(err){
+    console.error("Delete category error:",err);
+    // Restore locally if the cloud delete failed so the local/cloud state does not diverge.
+    state.categories.push(name);state.categories.sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));saveLocal();
+    alert(`Could not delete "${name}" from the cloud. The category has been restored locally.\n\n${err?.message||String(err)}`);
+    setSyncStatus("Sync error");
+    openCategoryManager();
+    render();
+  }
+}
 function openModal(){document.getElementById("modal").classList.add("show")}
 function closeModal(){document.getElementById("modal").classList.remove("show")}
 document.getElementById("modal").onclick=e=>{if(e.target.id==="modal")closeModal()}
@@ -313,7 +389,7 @@ function renderMaster(app){
   const ordered=categoryList().map(cat=>[cat,(groups[cat]||[]).sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}))]);
   const uid=currentUser?.id||"";
   const migrationNotice = ((!hasMigrationCompleted(uid) && (deviceLocalDataAvailable || backupHasCustomData(uid)))) ? `<div class="notice"><b>Device data found.</b> This device has Shop Path data that is not yet confirmed as synced to your cloud account. <button class="secondary" type="button" onclick="migrateNow()">Migrate this device</button></div>` : "";
-  app.innerHTML=`${migrationNotice}<div class="bar"><input id="search" placeholder="Search master list…"><button class="primary" onclick="openAdd()">Add Item</button></div><div class="bar"><button class="secondary" onclick="openStoreManager()">＋ Add Store</button><button class="secondary" onclick="addCategory()">＋ Add Category</button></div><p class="muted">Tap an item to include it in this week's shop. Tap the item name to set amount and store.</p><div id="masterSections">${ordered.map(([cat,arr])=>`<div class="section"><h2>${esc(cat)}</h2>${arr.length?arr.map(x=>`<div class="card item-card" data-name="${esc(x.name.toLowerCase())}"><div class="row"><button class="buy ${x.selected?"done":""}" onclick="toggleSelect('${esc(x.id)}')">${x.selected?"✓":"+"}</button><button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div><div class="storetag">Tap item to set quantity & store</div></button><button class="secondary" onclick="editItem('${esc(x.id)}')">Edit</button><button class="secondary" onclick="deleteItem('${esc(x.id)}')">Delete</button></div></div>`).join(""):`<div class="muted">No items in this category yet.</div>`}</div>`).join("")}</div>`; document.getElementById("search").oninput=e=>filterCards(e.target.value);
+  app.innerHTML=`${migrationNotice}<div class="bar"><input id="search" placeholder="Search master list…"><button class="primary" onclick="openAdd()">Add Item</button></div><div class="bar"><button class="secondary" onclick="openStoreManager()">＋ Add Store</button><button class="secondary" onclick="addCategory()">＋ Add Category</button><button class="secondary" onclick="openCategoryManager()">Manage Categories</button></div><p class="muted">Tap an item to include it in this week's shop. Tap the item name to set amount and store.</p><div id="masterSections">${ordered.map(([cat,arr])=>`<div class="section"><h2>${esc(cat)}</h2>${arr.length?arr.map(x=>`<div class="card item-card" data-name="${esc(x.name.toLowerCase())}"><div class="row"><button class="buy ${x.selected?"done":""}" onclick="toggleSelect('${esc(x.id)}')">${x.selected?"✓":"+"}</button><button class="itemname item-open" type="button" onclick="openShopItem('${esc(x.id)}')">${esc(x.name)}<div class="cat">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"PAK'nSAVE")}</div><div class="storetag">Tap item to set quantity & store</div></button><button class="secondary" onclick="editItem('${esc(x.id)}')">Edit</button><button class="secondary" onclick="deleteItem('${esc(x.id)}')">Delete</button></div></div>`).join(""):`<div class="muted">No items in this category yet.</div>`}</div>`).join("")}</div>`; document.getElementById("search").oninput=e=>filterCards(e.target.value);
 }
 async function clearRoute(){
   if(!confirm("Clear all learned route history for every store? Your Master List and current weekly shop will not be changed."))return;
@@ -381,10 +457,66 @@ function resetBought(){
   state.items.forEach(x=>{if(restore.has(x.id)){x.selected=true;x.bought=false}else x.bought=false});state.routesByStore={};state.route=[];state.shopStarted=null;saveLocal();render();queueCloudSync();
 }
 
-function openShopItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;const current=x.shopStore||x.store||"PAK'nSAVE";document.getElementById("sheet").innerHTML=`<h2>${esc(x.name)}</h2><p class="muted">Set what you want to buy this week.</p><label class="muted">Amount</label><input id="siQty" type="number" min="0" step="any" value="${esc(x.shopQty||x.usualQty||1)}"><select id="siUnit">${UNITS.map(u=>`<option ${u===(x.shopUnit||x.usualUnit)?"selected":""}>${u}</option>`).join("")}</select><label class="muted">Store</label><select id="siStore" onchange="if(this.value==='__ADD_STORE__')addStoreFromField('siStore')">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st===current?"selected":""}>${esc(st)}</option>`).join("")}<option value="__ADD_STORE__">＋ Add new store…</option></select><button class="secondary" type="button" onclick="addStoreFromField('siStore')">＋ Add new store</button><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveShopItem('${esc(id)}')">Save</button></div>`;openModal()}
+function openShopItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;const current=x.shopStore||x.store||"PAK'nSAVE";document.getElementById("sheet").innerHTML=`<h2>${esc(x.name)}</h2><p class="muted">Set what you want to buy this week.</p><label class="muted">Amount</label><div class="qty-stepper"><button class="secondary" type="button" onclick="adjustShopQty(-1)">−</button><input id="siQty" type="number" min="0" step="1" value="${esc(x.shopQty||x.usualQty||1)}"><button class="secondary" type="button" onclick="adjustShopQty(1)">+</button></div><select id="siUnit">${UNITS.map(u=>`<option ${u===(x.shopUnit||x.usualUnit)?"selected":""}>${u}</option>`).join("")}</select><label class="muted">Store</label><select id="siStore" onchange="if(this.value==='__ADD_STORE__')addStoreFromField('siStore')">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st===current?"selected":""}>${esc(st)}</option>`).join("")}<option value="__ADD_STORE__">＋ Add new store…</option></select><button class="secondary" type="button" onclick="addStoreFromField('siStore')">＋ Add new store</button><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveShopItem('${esc(id)}')">Save</button></div>`;openModal()}
+function adjustShopQty(delta){
+  const input=document.getElementById("siQty");
+  if(!input)return;
+  const current=Number(input.value);
+  const safe=Number.isFinite(current)?current:0;
+  const next=Math.max(0,Math.round((safe+delta)*100)/100);
+  input.value=String(next);
+}
 function saveShopItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;x.shopQty=document.getElementById("siQty").value||"1";x.shopUnit=document.getElementById("siUnit").value;let v=document.getElementById("siStore").value;if(v==="__ADD_STORE__")v=x.shopStore||x.store||"PAK'nSAVE";x.shopStore=ensureStore(v);x.selected=true;x.bought=false;saveLocal();closeModal();render();queueCloudSync()}
 function openAdd(){const cats=categoryList();document.getElementById("sheet").innerHTML=`<h2>Add item</h2><input id="aiName" placeholder="Item name" autocomplete="off"><label class="muted">Store</label><select id="aiStore">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st==="PAK'nSAVE"?"selected":""}>${esc(st)}</option>`).join("")}<option value="__ADD_STORE__">＋ Add new store…</option></select><button class="secondary" type="button" onclick="addStoreFromField('aiStore')">＋ Add new store</button><select id="aiCat">${cats.map(c=>`<option ${c==="Other"?"selected":""}>${esc(c)}</option>`).join("")}</select><input id="aiQty" type="number" min="0" step="any" value="1"><select id="aiUnit">${UNITS.map(u=>`<option>${u}</option>`).join("")}</select><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="addItem()">Add</button></div>`;openModal();setTimeout(()=>document.getElementById("aiName")?.focus(),50)}
 function addItem(){const name=document.getElementById("aiName").value.trim();if(!name){alert("Please enter an item name.");return}if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){alert("That item already exists.");return}let store=document.getElementById("aiStore").value;if(store==="__ADD_STORE__")store="PAK'nSAVE";store=ensureStore(store);const cat=document.getElementById("aiCat").value,q=document.getElementById("aiQty").value,u=document.getElementById("aiUnit").value;state.items.push({id:name,name,category:cat,store,shopStore:store,usualQty:q,usualUnit:u,shopQty:q,shopUnit:u,selected:true,bought:false});saveLocal();closeModal();render();queueCloudSync()}
+async function deleteItem(id){
+  const x=state.items.find(item=>item.id===id);
+  if(!x)return;
+  if(!confirm(`Delete "${x.name}" from your Master List?`))return;
+  const oldState=cloneState(state);
+  state.items=state.items.filter(item=>item.id!==id);
+  state.items.forEach(item=>{if(item.selected===undefined)item.selected=false;if(item.bought===undefined)item.bought=false;});
+  for(const map of [state.routesByStore,state.pairsByStore,state.orderStatsByStore,state.lastRoutesByStore]){
+    for(const store of Object.keys(map)){
+      if(Array.isArray(map[store]))map[store]=map[store].filter(v=>v!==id&&v!==x.name);
+      else if(map[store]&&typeof map[store]==='object'){
+        const next={};
+        for(const [k,v] of Object.entries(map[store])){
+          const parts=k.split("|");
+          if(parts[0]===id||parts[0]===x.name||parts[1]===id||parts[1]===x.name)continue;
+          next[k]=v;
+        }
+        map[store]=next;
+      }
+    }
+  }
+  saveLocal();
+  render();
+  try{
+    if(currentUser&&cloudReady){
+      const res=await db.from("master_items").delete().eq("user_id",currentUser.id).eq("name",x.name);
+      if(res.error)throw res.error;
+      // Remove the item from any currently open shopping trip, but keep completed
+      // shopping-trip history intact for route learning.
+      const open=await db.from("shopping_trips").select("id").eq("user_id",currentUser.id).eq("status","open");
+      if(open.error)throw open.error;
+      const ids=(open.data||[]).map(t=>t.id).filter(Boolean);
+      if(ids.length){
+        const del=await db.from("shopping_trip_items").delete().eq("user_id",currentUser.id).in("trip_id",ids).eq("item_name",x.name);
+        if(del.error)throw del.error;
+      }
+    }
+    setSyncStatus("Synced");
+    render();
+  }catch(err){
+    console.error("Delete item error:",err);
+    state=oldState;
+    saveLocal();
+    render();
+    alert(`Could not delete "${x.name}" from the cloud. The item has been restored.\n\n${err?.message||String(err)}`);
+    setSyncStatus("Sync error");
+  }
+}
 function editItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;document.getElementById("sheet").innerHTML=`<h2>Edit item</h2><input id="eiName" value="${esc(x.name)}"><select id="eiCat">${categoryList().map(c=>`<option ${c===x.category?"selected":""}>${esc(c)}</option>`).join("")}</select><label class="muted">Store</label><select id="eiStore">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st===(x.store||"PAK'nSAVE")?"selected":""}>${esc(st)}</option>`).join("")}</select><button class="secondary" type="button" onclick="addStoreFromField('eiStore')">＋ Add new store</button><input id="eiQty" type="number" min="0" step="any" value="${esc(x.usualQty)}"><select id="eiUnit">${UNITS.map(u=>`<option ${u===x.usualUnit?"selected":""}>${u}</option>`).join("")}</select><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveEdit('${esc(id)}')">Save</button></div>`;openModal()}
 function saveEdit(id){
   const x=state.items.find(x=>x.id===id); if(!x)return;
