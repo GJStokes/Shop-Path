@@ -201,37 +201,97 @@ function hasLocalCustomData(){
 }
 function pairwiseLearningScore(id,store,selectedIds){
   const stats=state.orderStatsByStore[store]||{};
-  // Rank by pairwise majority wins rather than raw summed margins.
-  // This makes repeated ordering behaviour easier to interpret: if an item
-  // has been observed before another item more often than the reverse, it
-  // wins that comparison. Total wins determine the primary rank, with total
-  // winning margin as a secondary confidence signal.
-  let wins=0, margin=0;
+  let wins=0, losses=0, margin=0, observed=0;
   for(const other of selectedIds){
     if(other===id)continue;
     const forward=Number(stats[id+"|"+other]||0);
     const reverse=Number(stats[other+"|"+id]||0);
     if(forward>reverse)wins++;
-    else if(forward===reverse && forward>0){}
+    else if(reverse>forward)losses++;
     margin += forward-reverse;
+    observed += forward+reverse;
   }
-  return {wins,margin};
+  return {wins,losses,margin,observed};
 }
-function compareLearnedItems(a,b,store,lastPos,selectedIds){
-  const as=pairwiseLearningScore(a.id,store,selectedIds);
-  const bs=pairwiseLearningScore(b.id,store,selectedIds);
-  if(as.wins!==bs.wins)return bs.wins-as.wins;
-  if(as.margin!==bs.margin)return bs.margin-as.margin;
+
+function compareLatestTie(a,b,lastPos){
   const ap=lastPos.has(a.id)?lastPos.get(a.id):Infinity;
   const bp=lastPos.has(b.id)?lastPos.get(b.id):Infinity;
   if(ap!==bp)return ap-bp;
   return a.name.localeCompare(b.name,undefined,{sensitivity:"base"});
 }
+
 function sortedSelectedByStore(store){
   const selected=state.items.filter(x=>x.selected&&(x.shopStore||x.store||"PAK'nSAVE")===store);
-  const learned=state.lastRoutesByStore[store]&&state.lastRoutesByStore[store].length?state.lastRoutesByStore[store]:(state.routesByStore[store]||[]);
-  const lastPos=new Map(learned.map((id,i)=>[id,i])); const ids=selected.map(x=>x.id);
-  return selected.sort((a,b)=>compareLearnedItems(a,b,store,lastPos,ids));
+  if(selected.length<=1)return selected;
+
+  const learned=(state.lastRoutesByStore[store]&&state.lastRoutesByStore[store].length)
+    ? state.lastRoutesByStore[store]
+    : (state.routesByStore[store]||[]);
+  const lastPos=new Map(learned.map((id,i)=>[id,i]));
+  const ids=selected.map(x=>x.id);
+  const byId=new Map(selected.map(x=>[x.id,x]));
+  const stats=state.orderStatsByStore[store]||{};
+
+  // Build a majority-preference graph from the cumulative history. A clear
+  // majority such as Sausages -> Fries becomes a hard ordering constraint.
+  const outgoing=new Map(ids.map(id=>[id,new Map()]));
+  const indegree=new Map(ids.map(id=>[id,0]));
+  for(let i=0;i<ids.length;i++){
+    for(let j=i+1;j<ids.length;j++){
+      const a=ids[i], b=ids[j];
+      const ab=Number(stats[a+"|"+b]||0);
+      const ba=Number(stats[b+"|"+a]||0);
+      if(ab===ba)continue;
+      const winner=ab>ba?a:b;
+      const loser=ab>ba?b:a;
+      const strength=Math.abs(ab-ba);
+      outgoing.get(winner).set(loser,{strength,total:ab+ba});
+      indegree.set(loser,indegree.get(loser)+1);
+    }
+  }
+
+  const placed=new Set();
+  const order=[];
+  while(placed.size<ids.length){
+    let candidates=ids.filter(id=>!placed.has(id)&&indegree.get(id)===0);
+    if(!candidates.length){
+      // Cyclic preferences can occur when behaviour genuinely varies. Break
+      // the weakest remaining incoming constraint, then continue topologically.
+      const remaining=ids.filter(id=>!placed.has(id));
+      let breakLoser=remaining[0], breakWinner=null, weakest=Infinity;
+      for(const loser of remaining){
+        for(const [winner,edges] of outgoing.entries()){
+          if(placed.has(winner))continue;
+          const edge=edges.get(loser);
+          if(edge && edge.strength<weakest){weakest=edge.strength;breakLoser=loser;breakWinner=winner;}
+        }
+      }
+      if(breakWinner!==null) {
+        const edge=outgoing.get(breakWinner).get(breakLoser);
+        outgoing.get(breakWinner).delete(breakLoser);
+        indegree.set(breakLoser,Math.max(0,indegree.get(breakLoser)-1));
+        candidates=ids.filter(id=>!placed.has(id)&&indegree.get(id)===0);
+      }
+      if(!candidates.length)candidates=remaining;
+    }
+
+    candidates.sort((a,b)=>{
+      const sa=pairwiseLearningScore(a,store,ids), sb=pairwiseLearningScore(b,store,ids);
+      if(sa.wins!==sb.wins)return sb.wins-sa.wins;
+      if(sa.margin!==sb.margin)return sb.margin-sa.margin;
+      return compareLatestTie(byId.get(a),byId.get(b),lastPos);
+    });
+
+    const chosen=candidates[0];
+    order.push(byId.get(chosen));
+    placed.add(chosen);
+    for(const loser of outgoing.get(chosen).keys()){
+      if(!placed.has(loser))indegree.set(loser,Math.max(0,indegree.get(loser)-1));
+    }
+  }
+
+  return order;
 }
 function ensureStore(store){store=(store||"PAK'nSAVE").trim()||"PAK'nSAVE";if(!state.stores.includes(store))state.stores.push(store);if(!state.routesByStore[store])state.routesByStore[store]=[];if(!state.pairsByStore[store])state.pairsByStore[store]={};if(!state.orderStatsByStore[store])state.orderStatsByStore[store]={};return store}
 function filterCards(q){
@@ -631,20 +691,10 @@ async function deleteItem(id){
   const oldState=cloneState(state);
   state.items=state.items.filter(item=>item.id!==id);
   state.items.forEach(item=>{if(item.selected===undefined)item.selected=false;if(item.bought===undefined)item.bought=false;});
-  for(const map of [state.routesByStore,state.pairsByStore,state.orderStatsByStore,state.lastRoutesByStore]){
-    for(const store of Object.keys(map)){
-      if(Array.isArray(map[store]))map[store]=map[store].filter(v=>v!==id&&v!==x.name);
-      else if(map[store]&&typeof map[store]==='object'){
-        const next={};
-        for(const [k,v] of Object.entries(map[store])){
-          const parts=k.split("|");
-          if(parts[0]===id||parts[0]===x.name||parts[1]===id||parts[1]===x.name)continue;
-          next[k]=v;
-        }
-        map[store]=next;
-      }
-    }
-  }
+  // Keep completed route history intact. Deleting a Master List item only removes
+  // it from future shopping; historical routes and cumulative route evidence are
+  // deliberately preserved. The deleted item's name is its id, so historical
+  // displays remain readable even though the item is no longer in Master List.
   saveLocal();
   render();
   try{
