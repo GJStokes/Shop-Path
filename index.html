@@ -1,3 +1,108 @@
+Yes — and from now on, after every commit, we'll check this before testing the app. 👍
+
+For your Shop-Path repository, the easiest place is:
+
+GitHub → Actions
+Open your Shop-Path repository.
+Click Actions at the top.
+Look for the latest Pages build and deployment run.
+Click it.
+Wait until you see a green checkmark / successful status.
+
+GitHub documents that Pages deployments can be monitored from the Actions tab, where you can open the latest workflow run and see its status.
+
+There's also another useful place
+
+On the repository's main page, you can click Deployments in the right-hand sidebar. GitHub's deployment history shows the deployment status, the commit that triggered it, and the deployed URL when available.
+
+Our new workflow
+
+From now on:
+
+Make code change → Commit → GitHub Actions → wait for green ✅ → refresh Shop Path → test
+
+That should prevent us from repeatedly testing an older cached/deployment version.
+
+After the next commit, I can also tell you exactly which screen to open and what green status we're looking for.
+
+Yes — that is the screen you want. ✅
+
+Your screenshot shows:
+
+pages build and deployment #41
+Status: Success ✅
+
+And all three stages have green checks:
+
+build ✅
+report-build-status ✅
+deploy ✅
+
+It also shows the deployed site:
+
+https://gjstokes.github.io/Shop-Path/
+
+So deployment is complete.
+
+One small warning
+
+GitHub is showing a warning that Node.js 20 is deprecated for one of the underlying Actions components. That does not mean your Shop Path deployment failed. The deployment itself completed successfully.
+
+From now on
+
+After every code commit, this is the screen we should check.
+
+Green “Success” + green “deploy” = safe to test the new version. ✅
+
+Then on the iMac we'll do a hard refresh, and on the iPhone we'll test Safari/Home Screen as appropriate.
+
+For the current consolidated update, #41 is successfully deployed.
+
+So we are going to fix the bugs one deployment at a time, because nothing has changed in that latest deployment. So the first bug I want to fix is we have a test category called Test Shop, and then we have a test item, which has been added to the Test Shop category, Test Store if you like, but it's still not displaying in the master list as the Test Store. There is no Test Store category. At the bottom of the master list, we have a Test Renamed category, but there's no items in that category, and the Test item is now displayed in the Other section, even though it is showing as being added to Test Store.
+
+Yes — we're fixing one bug at a time, starting with this category-assignment problem.
+
+I've prepared a focused update only for this issue. It makes two important changes:
+
+The Add Item window now clearly labels Category separately from Default store, so they cannot easily be confused.
+When an item is saved, Shop Path now makes sure its selected custom category exists in Supabase before saving the item. It also protects against an item silently falling back to Other when the category exists locally.
+
+The existing 29 standard categories remain unchanged.
+
+Updated code
+
+⬇️ Download the corrected index.html
+
+⬇️ Download ZIP
+
+The JavaScript syntax has been checked successfully.
+
+One deployment only
+
+Replace the entire index.html in Shop-Path on GitHub with this version and commit it.
+
+Then check GitHub → Actions → pages build and deployment until you see:
+
+Success ✅
+build ✅
+deploy ✅
+
+Once deployment is green, we'll test only this:
+
+Add Category → Test Shop
+Add Item → Test Item → Category: Test Shop → Default store: Test Store
+
+Then refresh both devices.
+
+We should see:
+
+Test Shop
+→ Test Item
+
+and not Test Item under Other.
+
+Tell me “committed” once you've deployed it.
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -692,8 +797,8 @@ function adjustShopQty(delta){
   input.value=String(next);
 }
 function saveShopItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;x.shopQty=document.getElementById("siQty").value||"1";x.shopUnit=document.getElementById("siUnit").value;let v=document.getElementById("siStore").value;if(v==="__ADD_STORE__")v=x.shopStore||x.store||"PAK'nSAVE";x.shopStore=ensureStore(v);x.selected=true;x.bought=false;saveLocal();closeModal();render();queueCloudSync()}
-function openAdd(){const cats=categoryList();document.getElementById("sheet").innerHTML=`<h2>Add item</h2><input id="aiName" placeholder="Item name" autocomplete="off"><label class="muted">Store</label><select id="aiStore">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st==="PAK'nSAVE"?"selected":""}>${esc(st)}</option>`).join("")}<option value="__ADD_STORE__">＋ Add new store…</option></select><button class="secondary" type="button" onclick="addStoreFromField('aiStore')">＋ Add new store</button><select id="aiCat">${cats.map(c=>`<option ${c==="Other"?"selected":""}>${esc(c)}</option>`).join("")}</select><input id="aiQty" type="number" min="0" step="any" value="1"><select id="aiUnit">${UNITS.map(u=>`<option>${u}</option>`).join("")}</select><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="addItem()">Add</button></div>`;openModal();setTimeout(()=>document.getElementById("aiName")?.focus(),50)}
-function addItem(){const name=document.getElementById("aiName").value.trim();if(!name){alert("Please enter an item name.");return}if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){alert("That item already exists.");return}let store=document.getElementById("aiStore").value;if(store==="__ADD_STORE__")store="PAK'nSAVE";store=ensureStore(store);const cat=document.getElementById("aiCat").value,q=document.getElementById("aiQty").value,u=document.getElementById("aiUnit").value;state.items.push({id:name,name,category:cat,store,shopStore:store,usualQty:q,usualUnit:u,shopQty:q,shopUnit:u,selected:true,bought:false});saveLocal();closeModal();render();queueCloudSync()}
+function openAdd(){const cats=categoryList();document.getElementById("sheet").innerHTML=`<h2>Add item</h2><input id="aiName" placeholder="Item name" autocomplete="off"><label class="muted" for="aiCat">Category</label><select id="aiCat">${cats.map(c=>`<option ${c==="Other"?"selected":""}>${esc(c)}</option>`).join("")}</select><label class="muted" for="aiStore">Default store</label><select id="aiStore">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st==="PAK'nSAVE"?"selected":""}>${esc(st)}</option>`).join("")}<option value="__ADD_STORE__">＋ Add new store…</option></select><button class="secondary" type="button" onclick="addStoreFromField('aiStore')">＋ Add new store</button><label class="muted" for="aiQty">Usual quantity</label><input id="aiQty" type="number" min="0" step="any" value="1"><label class="muted" for="aiUnit">Unit</label><select id="aiUnit">${UNITS.map(u=>`<option>${u}</option>`).join("")}</select><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="addItem()">Add</button></div>`;openModal();setTimeout(()=>document.getElementById("aiName")?.focus(),50)}
+function addItem(){const name=document.getElementById("aiName").value.trim();if(!name){alert("Please enter an item name.");return}if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){alert("That item already exists.");return}let store=document.getElementById("aiStore").value;if(store==="__ADD_STORE__")store="PAK'nSAVE";store=ensureStore(store);const cat=(document.getElementById("aiCat").value||"Other").trim();if(!state.categories.some(c=>c.toLowerCase()===cat.toLowerCase()))state.categories.push(cat);const q=document.getElementById("aiQty").value,u=document.getElementById("aiUnit").value;state.items.push({id:name,name,category:cat,store,shopStore:store,usualQty:q,usualUnit:u,shopQty:q,shopUnit:u,selected:true,bought:false});saveLocal();closeModal();render();queueCloudSync()}
 async function deleteItem(id){
   const x=state.items.find(item=>item.id===id);
   if(!x)return;
@@ -965,7 +1070,8 @@ async function downloadIntoLocal(remote){
   const uid=currentUser.id; const catById=Object.fromEntries(remote.categories.map(x=>[x.id,x.name])); const storeById=Object.fromEntries(remote.stores.map(x=>[x.id,x.name]));
   state.categories=remote.categories.length?remote.categories.sort((a,b)=>a.sort_order-b.sort_order).map(x=>x.name):[...CATEGORIES];
   state.stores=remote.stores.length?remote.stores.sort((a,b)=>a.sort_order-b.sort_order).map(x=>x.name):[...DEFAULT_STORES];
-  state.items=(remote.items||[]).sort((a,b)=>a.sort_order-b.sort_order).map(x=>({id:x.name,name:x.name,category:catById[x.category_id]||"Other",store:storeById[x.default_store_id]||"PAK'nSAVE",shopStore:storeById[x.default_store_id]||"PAK'nSAVE",usualQty:String(x.usual_quantity??1),usualUnit:x.usual_unit||"each",shopQty:String(x.usual_quantity??1),shopUnit:x.usual_unit||"each",selected:false,bought:false}));
+  const localCategoryByItemName=Object.fromEntries((state.items||[]).map(i=>[String(i.name||"").trim().toLowerCase(),i.category||"Other"]));
+  state.items=(remote.items||[]).sort((a,b)=>a.sort_order-b.sort_order).map(x=>({id:x.name,name:x.name,category:catById[x.category_id]||localCategoryByItemName[String(x.name||"").trim().toLowerCase()]||"Other",store:storeById[x.default_store_id]||"PAK'nSAVE",shopStore:storeById[x.default_store_id]||"PAK'nSAVE",usualQty:String(x.usual_quantity??1),usualUnit:x.usual_unit||"each",shopQty:String(x.usual_quantity??1),shopUnit:x.usual_unit||"each",selected:false,bought:false}));
   remapStandardCategories();
   // Restore most recent open shopping trip, if there is one.
   const openTrip=(remote.trips||[]).find(t=>t.status==="open");
@@ -1158,18 +1264,31 @@ async function syncMasterData(){
 
   const safeCats=Array.isArray(cats2)?cats2:[];
   const safeStores=Array.isArray(stores2)?stores2:[];
-  const catMap=Object.fromEntries(safeCats.map(x=>[x.name,x.id]));
-  const storeMap=Object.fromEntries(safeStores.map(x=>[x.name,x.id]));
+  const catMap=Object.fromEntries(safeCats.map(x=>[String(x.name||"").trim().toLowerCase(),x.id]));
+  const storeMap=Object.fromEntries(safeStores.map(x=>[String(x.name||"").trim().toLowerCase(),x.id]));
+
+  const missingCats=[...new Set(state.items.map(x=>String(x.category||"Other").trim()).filter(name=>name&&!catMap[name.toLowerCase()]))];
+  if(missingCats.length){
+    const addRows=missingCats.map((name,i)=>({user_id:uid,name,sort_order:safeCats.length+i}));
+    const addRes=await db.from("categories").upsert(addRows,{onConflict:"user_id,name"});
+    if(addRes.error)throw addRes.error;
+    const {data:cats3,error:c3}=await db.from("categories").select("id,name").eq("user_id",uid);
+    if(c3)throw c3;
+    safeCats.splice(0,safeCats.length,...(Array.isArray(cats3)?cats3:[]));
+    for(const c of safeCats)catMap[String(c.name||"").trim().toLowerCase()]=c.id;
+  }
 
   const rows=state.items.map((x,i)=>({
     user_id:uid,
     name:x.name,
-    category_id:catMap[x.category]||null,
-    default_store_id:storeMap[x.store||"PAK'nSAVE"]||null,
+    category_id:catMap[String(x.category||"Other").trim().toLowerCase()]||null,
+    default_store_id:storeMap[String(x.store||"PAK'nSAVE").trim().toLowerCase()]||null,
     usual_quantity:Number(x.usualQty)||1,
     usual_unit:x.usualUnit||"each",
     sort_order:i
   }));
+  const unresolved=rows.filter(row=>!row.category_id||!row.default_store_id);
+  if(unresolved.length)throw new Error(`One or more items are missing a valid category or default store: ${unresolved.map(r=>r.name).join(", ")}`);
   r=await db.from("master_items").upsert(rows,{onConflict:"user_id,name"});
   if(r.error)throw r.error;
 
@@ -1251,3 +1370,5 @@ db.auth.onAuthStateChange(async (_event,session)=>{if(session&&!currentUser){try
 </script>
 </body>
 </html>
+index.html
+HTML
