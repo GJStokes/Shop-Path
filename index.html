@@ -13,7 +13,7 @@ h1{font-size:20px;margin:0 0 10px}.tabs{display:flex;gap:6px}.tab{flex:1;border:
 main{max-width:760px;margin:auto;padding:12px 12px 100px}.bar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}.bar input{flex:1;min-width:180px;padding:12px;border:1px solid #d1d5db;border-radius:10px;font-size:16px}
 button{font:inherit}.primary{background:#111827;color:white;border:0;border-radius:10px;padding:12px 14px;font-weight:700}.secondary{background:white;border:1px solid #d1d5db;border-radius:10px;padding:10px 12px}
 .card{background:white;border-radius:14px;margin:8px 0;padding:12px;box-shadow:0 1px 4px #0001}.row{display:flex;align-items:center;gap:10px}.itemname{font-weight:700;flex:1}.cat{font-size:12px;color:#6b7280;margin-top:3px}
-.buy{width:42px;height:42px;border-radius:12px;border:2px solid #9ca3af;background:white;font-size:20px}.buy.done{background:#111827;color:white;border-color:#111827}.qty{display:flex;align-items:center;gap:5px}.qty input{width:54px;text-align:center;padding:7px;border:1px solid #d1d5db;border-radius:8px}.qty-stepper{display:flex;align-items:center;justify-content:center;gap:10px;margin:6px 0}.qty-stepper button{min-width:48px;min-height:46px;font-size:24px;line-height:1}.qty-stepper input{flex:1;max-width:120px;text-align:center;padding:11px;border:1px solid #d1d5db;border-radius:10px;font-size:18px}.qty select{padding:7px;border:1px solid #d1d5db;border-radius:8px;background:white}
+.buy{width:42px;height:42px;border-radius:12px;border:2px solid #9ca3af;background:white;font-size:20px}.buy.done{background:#111827;color:white;border-color:#111827}.qty{display:flex;align-items:center;gap:5px}.qty-stepper{display:flex;align-items:center;gap:8px;margin:5px 0 8px}.qty-stepper button{min-width:46px;height:44px;font-size:24px;line-height:1}.qty-stepper input{width:80px!important;margin:0!important;text-align:center}.qty input{width:54px;text-align:center;padding:7px;border:1px solid #d1d5db;border-radius:8px}.qty-stepper{display:flex;align-items:center;justify-content:center;gap:10px;margin:6px 0}.qty-stepper button{min-width:48px;min-height:46px;font-size:24px;line-height:1}.qty-stepper input{flex:1;max-width:120px;text-align:center;padding:11px;border:1px solid #d1d5db;border-radius:10px;font-size:18px}.qty select{padding:7px;border:1px solid #d1d5db;border-radius:8px;background:white}
 .section{margin-top:18px}.section h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}.storetag{font-size:12px;color:#374151;margin-top:3px;font-weight:600}.item-open{border:0;background:transparent;padding:0;text-align:left;cursor:pointer;flex:1}.item-open:active{opacity:.7}
 .muted{color:#6b7280;font-size:13px}.empty{padding:30px;text-align:center;color:#6b7280}.stats{display:flex;gap:8px;margin-bottom:10px}.stat{background:white;border-radius:12px;padding:10px;flex:1;text-align:center}.stat b{display:block;font-size:20px}
 .modal{position:fixed;inset:0;background:#0007;display:none;z-index:20;padding:18px}.modal.show{display:flex;align-items:flex-end}.sheet{background:white;border-radius:18px 18px 0 0;width:100%;max-height:85vh;overflow:auto;padding:16px}.sheet h2{margin-top:0}.sheet input,.sheet select{width:100%;padding:12px;margin:5px 0;border:1px solid #d1d5db;border-radius:10px;font-size:16px}.actions{display:flex;gap:8px;margin-top:10px}.actions button{flex:1}.store-list{margin:10px 0}.store-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #eee}.store-row span{flex:1;font-weight:600}.store-row button{padding:7px 10px}.store-add{display:flex;gap:8px;margin-top:12px}.store-add input{flex:1;margin:0}.store-add button{white-space:nowrap}.search-results{margin-top:18px}.search-results h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}
@@ -298,8 +298,19 @@ function renameStore(oldName){
 }
 function deleteStore(name){
   if(state.stores.length<=1){alert("Keep at least one store.");return;}
-  if(state.items.some(x=>x.store===name||x.shopStore===name)){alert(`"${name}" is assigned to one or more items. Reassign those items before deleting the store.`);return;}
-  if(!confirm(`Delete "${name}" from your store list?`))return;
+  const assigned=state.items.filter(x=>x.store===name||x.shopStore===name);
+  let replacement=null;
+  if(assigned.length){
+    const choices=state.stores.filter(st=>st!==name);
+    const menu=choices.map((st,i)=>`${i+1}. ${st}`).join("\n");
+    const answer=prompt(`\"${name}\" is assigned to ${assigned.length} item${assigned.length===1?"":"s"}.\n\nChoose the replacement store by number, or Cancel to stop.\n\n${menu}`);
+    if(answer===null)return;
+    const idx=Number(answer)-1;
+    if(!Number.isInteger(idx)||!choices[idx]){alert("Please enter a valid replacement store number.");return;}
+    replacement=choices[idx];
+  }
+  if(!confirm(`Delete "${name}" from your store list?${replacement?`\n\n${assigned.length} assigned item${assigned.length===1?"":"s"} will be moved to "${replacement}".`:""}`))return;
+  if(replacement){state.items.forEach(x=>{if(x.store===name)x.store=replacement;if(x.shopStore===name)x.shopStore=replacement;});}
   state.stores=state.stores.filter(st=>st!==name);
   delete state.routesByStore[name];delete state.pairsByStore[name];delete state.orderStatsByStore[name];delete state.lastRoutesByStore[name];
   saveLocal();queueCloudSync(true);openStoreManager();
@@ -463,17 +474,38 @@ function renderRoute(app){
 function toggleSelect(id){const x=state.items.find(x=>x.id===id);if(!x)return;x.selected=!x.selected;x.bought=false;if(x.selected&&!x.shopStore)x.shopStore=x.store||"PAK'nSAVE";saveLocal();render();queueCloudSync()}
 function selectAll(v){state.items.forEach(x=>{if(!v)x.selected=false;x.bought=false});saveLocal();render();queueCloudSync()}
 function buy(id){
-  const it=state.items.find(x=>x.id===id);if(!it||it.bought)return;const store=ensureStore(it.shopStore||it.store);if(!state.shopStarted)state.shopStarted=Date.now();const route=state.routesByStore[store],prev=route[route.length-1];if(prev&&prev!==id){const k=prev+"|"+id;state.pairsByStore[store][k]=(state.pairsByStore[store][k]||0)+1}route.push(id);it.bought=true;
+  const it=state.items.find(x=>x.id===id);
+  if(!it)return;
+  if(it.bought)return;
+  const store=ensureStore(it.shopStore||it.store);
+  if(!state.shopStarted)state.shopStarted=Date.now();
+  const route=state.routesByStore[store];
+  // Never record the same item twice in one active trip, even if a stale UI state
+  // or repeated tap attempts somehow reach this handler.
+  if(!route.includes(id)){
+    const prev=route[route.length-1];
+    if(prev&&prev!==id){const k=prev+"|"+id;state.pairsByStore[store][k]=(state.pairsByStore[store][k]||0)+1;}
+    route.push(id);
+  }
+  it.bought=true;
   const remaining=state.items.some(x=>x.selected&&!x.bought);
   if(!remaining){
     const completed={};
-    for(const [st,r] of Object.entries(state.routesByStore||{})){if(!r?.length)continue;completed[st]=[...r];const stats=state.orderStatsByStore[st]??={};for(let i=0;i<r.length;i++)for(let j=i+1;j<r.length;j++)if(r[i]!==r[j])stats[r[i]+"|"+r[j]]=(stats[r[i]+"|"+r[j]]||0)+1;state.orderStatsByStore[st]=stats;state.lastRoutesByStore[st]=[...r]}
-    // Clear the completed week's checkmarks but keep the learned route history.
+    for(const [st,r] of Object.entries(state.routesByStore||{})){
+      const clean=[...new Set((r||[]).filter(Boolean))];
+      if(!clean.length)continue;
+      completed[st]=clean;
+      const stats=state.orderStatsByStore[st]??={};
+      for(let i=0;i<clean.length;i++)for(let j=i+1;j<clean.length;j++)if(clean[i]!==clean[j])stats[clean[i]+"|"+clean[j]]=(stats[clean[i]+"|"+clean[j]]||0)+1;
+      state.orderStatsByStore[st]=stats;
+      state.lastRoutesByStore[st]=[...clean];
+    }
     state.items.forEach(x=>{if(x.selected&&x.bought){x.selected=false;x.bought=false}});
     state.routesByStore={};state.route=[];state.shopStarted=null;saveLocal();render();queueCloudSync();syncCompletedTrip(completed).catch(console.error);return;
   }
   saveLocal();render();queueCloudSync();
 }
+
 function resetBought(){
   const restore=new Set(Object.values(state.lastRoutesByStore||{}).flat());if(!restore.size){alert("There is no completed shop to restore yet.");return};
   state.items.forEach(x=>{if(restore.has(x.id)){x.selected=true;x.bought=false}else x.bought=false});state.routesByStore={};state.route=[];state.shopStarted=null;saveLocal();render();queueCloudSync();
@@ -528,8 +560,10 @@ async function deleteItem(id){
         if(del.error)throw del.error;
       }
     }
+    localDirty=true;
     setSyncStatus("Synced");
     render();
+    queueCloudSync();
   }catch(err){
     console.error("Delete item error:",err);
     state=oldState;
@@ -561,7 +595,9 @@ function saveEdit(id){
     }
   }
   x.name=newName; x.id=newName; x.category=document.getElementById("eiCat").value;
-  x.store=ensureStore(document.getElementById("eiStore").value); x.shopStore=x.shopStore===oldName||!x.shopStore?x.store:x.shopStore;
+  const editedStore=ensureStore(document.getElementById("eiStore").value);
+  x.store=editedStore;
+  x.shopStore=editedStore;
   x.usualQty=document.getElementById("eiQty").value||"1"; x.usualUnit=document.getElementById("eiUnit").value; x.shopQty=x.usualQty; x.shopUnit=x.usualUnit;
   saveLocal(); closeModal(); render(); queueCloudSync();
 }
@@ -789,7 +825,7 @@ async function ensureProfile(){
 async function fetchRemoteState(){
   if(!currentUser) throw new Error("No authenticated user");
   const uid=currentUser.id;
-  const [cats,stores,items,trips,pairs,routes]=await Promise.all([
+  const run=()=>Promise.all([
     db.from("categories").select("id,name,sort_order").eq("user_id",uid).order("sort_order",{ascending:true}),
     db.from("stores").select("id,name,sort_order").eq("user_id",uid).order("sort_order",{ascending:true}),
     db.from("master_items").select("id,name,category_id,default_store_id,usual_quantity,usual_unit,sort_order").eq("user_id",uid).order("sort_order",{ascending:true}),
@@ -797,7 +833,17 @@ async function fetchRemoteState(){
     db.from("route_pairs").select("id,store_name,item_a_name,item_b_name,observations,last_observed_at").eq("user_id",uid),
     db.from("latest_store_routes").select("id,store_name,trip_id,route_items,completed_at").eq("user_id",uid)
   ]);
-  for(const result of [cats,stores,items,trips,pairs,routes]) if(result.error) throw result.error;
+  let result;
+  for(let attempt=0;attempt<3;attempt++){
+    result=await run();
+    const err=result.find(r=>r.error)?.error;
+    if(!err)break;
+    const futureJwt=err.code==="PGRST303"||/JWT issued at future/i.test(err.message||"");
+    if(!futureJwt||attempt===2)throw err;
+    await new Promise(resolve=>setTimeout(resolve,700*(attempt+1)));
+  }
+  const [cats,stores,items,trips,pairs,routes]=result;
+  for(const response of [cats,stores,items,trips,pairs,routes]) if(response.error) throw response.error;
   return {
     categories:cats.data||[],
     stores:stores.data||[],
@@ -822,7 +868,7 @@ async function syncCompletedTrip(completed){
   const uid=currentUser.id; const {data:open,error:e}=await db.from("shopping_trips").select("id,started_at").eq("user_id",uid).eq("status","open").order("created_at",{ascending:false}).limit(1);if(e)throw e;
   const now=new Date().toISOString(); let tripId=open?.[0]?.id;
   if(!tripId){const ins=await db.from("shopping_trips").insert({user_id:uid,status:"completed",started_at:now,completed_at:now}).select("id").single();if(ins.error)throw ins.error;tripId=ins.data.id}else{const up=await db.from("shopping_trips").update({status:"completed",completed_at:now,updated_at:now}).eq("id",tripId).eq("user_id",uid);if(up.error)throw up.error}
-  const routeRows=[];for(const [store,route] of Object.entries(completed))for(let i=0;i<route.length;i++)routeRows.push({trip_id:tripId,user_id:uid,item_name:state.items.find(x=>x.id===route[i])?.name||route[i],quantity:1,unit:"each",store_name:store,bought:true,bought_at:now,route_position:i+1});
+  const routeRows=[];for(const [store,rawRoute] of Object.entries(completed)){const route=[...new Set((rawRoute||[]).filter(Boolean))];for(let i=0;i<route.length;i++)routeRows.push({trip_id:tripId,user_id:uid,item_name:state.items.find(x=>x.id===route[i])?.name||route[i],quantity:1,unit:"each",store_name:store,bought:true,bought_at:now,route_position:i+1});}
   const del=await db.from("shopping_trip_items").delete().eq("trip_id",tripId).eq("user_id",uid);if(del.error)throw del.error;if(routeRows.length){const ins=await db.from("shopping_trip_items").insert(routeRows);if(ins.error)throw ins.error}
   await replaceCloudRoutes();setSyncStatus("Synced");
 }
@@ -868,7 +914,7 @@ async function replaceCloudRoutes(){
   for(const [key,rows] of byTripStore.entries()){
     rows.sort((a,b)=>Number(a.route_position)-Number(b.route_position));
     const [tripId,store]=key.split("||");
-    const route=rows.map(r=>r.item_name).filter(Boolean);
+    const route=[...new Set(rows.map(r=>r.item_name).filter(Boolean))];
 
     aggregate[store]??={};
     for(let i=0;i<route.length;i++){
@@ -961,6 +1007,17 @@ async function syncMasterData(){
   }));
   r=await db.from("master_items").upsert(rows,{onConflict:"user_id,name"});
   if(r.error)throw r.error;
+
+  const legacyCategoryNames=["Pantry","Asian Ingredients","Baking & Cooking Essentials","Household & Cleaning"];
+  if(legacyCategoryNames.length){
+    const legacy=await db.from("categories").select("id,name").eq("user_id",uid).in("name",legacyCategoryNames);
+    if(legacy.error)throw legacy.error;
+    const legacyIds=(legacy.data||[]).map(x=>x.id).filter(Boolean);
+    if(legacyIds.length){
+      const delLegacy=await db.from("categories").delete().eq("user_id",uid).in("id",legacyIds);
+      if(delLegacy.error)throw delLegacy.error;
+    }
+  }
 
   const {data:ritems,error:ri}=await db.from("master_items").select("id,name").eq("user_id",uid);
   if(ri)throw ri;
