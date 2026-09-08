@@ -277,9 +277,21 @@ function rebuildStoreSelect(fieldId,selected){
 }
 function openStoreManager(){
   const stores=state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
-  document.getElementById("sheet").innerHTML=`<h2>Manage stores</h2><p class="muted">Add, rename or delete the stores you shop at.</p><div class="store-list">${stores.map(st=>`<div class="store-row"><span>${esc(st)}</span><button class="secondary" onclick="renameStore(decodeURIComponent('${encodeURIComponent(st)}'))">Rename</button><button class="secondary" onclick="deleteStore(decodeURIComponent('${encodeURIComponent(st)}'))">Delete</button></div>`).join("")}</div><div class="store-add"><input id="newStoreName" placeholder="New store name" autocomplete="off"><button class="primary" onclick="addStore()">Add store</button></div><div class="actions"><button class="secondary" onclick="closeModal()">Done</button></div>`;
+  document.getElementById("sheet").innerHTML=`<h2>Manage stores</h2><p class="muted">Add, rename or delete the stores you shop at.</p><div class="store-list">${stores.map((st,i)=>`<div class="store-row"><span>${esc(st)}</span><button class="secondary" onclick="renameStoreByIndex(${i})">Rename</button><button class="secondary" onclick="deleteStoreByIndex(${i})">Delete</button></div>`).join("")}</div><div class="store-add"><input id="newStoreName" placeholder="New store name" autocomplete="off"><button class="primary" onclick="addStore()">Add store</button></div><div class="actions"><button class="secondary" onclick="closeModal()">Done</button></div>`;
   openModal();
   setTimeout(()=>document.getElementById("newStoreName")?.focus(),50);
+}
+function getManagedStoreByIndex(index){
+  const stores=state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
+  return Number.isInteger(index) ? stores[index] : null;
+}
+function renameStoreByIndex(index){
+  const oldName=getManagedStoreByIndex(index);
+  if(oldName) renameStore(oldName);
+}
+function deleteStoreByIndex(index){
+  const name=getManagedStoreByIndex(index);
+  if(name) deleteStore(name);
 }
 function addStore(){
   const input=document.getElementById("newStoreName"); const name=(input?.value||"").trim();
