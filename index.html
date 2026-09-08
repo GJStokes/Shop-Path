@@ -299,16 +299,91 @@ function addStore(){
   if(state.stores.some(st=>st.toLowerCase()===name.toLowerCase())){alert("That store already exists.");input?.focus();return;}
   ensureStore(name);saveLocal();queueCloudSync();openStoreManager();
 }
-function renameStore(oldName){
-  const next=prompt("Rename store:",oldName); if(next===null)return; const name=next.trim();
+async function cloudRenameStore(oldName,newName){
+  if(!currentUser||!cloudReady)return;
+  const uid=currentUser.id;
+  const {data:oldRows,error:oldErr}=await db.from("stores").select("id,name").eq("user_id",uid).eq("name",oldName).limit(1);
+  if(oldErr)throw oldErr;
+  const oldRow=Array.isArray(oldRows)&&oldRows.length?oldRows[0]:null;
+  if(!oldRow) {
+    // The local store may have been created or renamed on another device.
+    // The regular sync path will still persist the current name.
+    await syncMasterData();
+    return;
+  }
+  const {data:newRows,error:newErr}=await db.from("stores").upsert({user_id:uid,name:newName,sort_order:oldRow.sort_order},{onConflict:"user_id,name"}).select("id").limit(1);
+  if(newErr)throw newErr;
+  const newRow=Array.isArray(newRows)&&newRows.length?newRows[0]:null;
+  const newId=newRow?.id||null;
+  if(oldRow.id!==newId){
+    let r=await db.from("master_items").update({default_store_id:newId}).eq("user_id",uid).eq("default_store_id",oldRow.id);
+    if(r.error)throw r.error;
+    r=await db.from("shopping_trip_items").update({store_id:newId,store_name:newName}).eq("user_id",uid).eq("store_id",oldRow.id);
+    if(r.error)throw r.error;
+  }
+  let r=await db.from("route_pairs").update({store_name:newName}).eq("user_id",uid).eq("store_name",oldName);
+  if(r.error)throw r.error;
+  r=await db.from("latest_store_routes").update({store_name:newName}).eq("user_id",uid).eq("store_name",oldName);
+  if(r.error)throw r.error;
+  r=await db.from("stores").delete().eq("user_id",uid).eq("id",oldRow.id);
+  if(r.error)throw r.error;
+}
+async function cloudDeleteStore(name,replacement){
+  if(!currentUser||!cloudReady)return;
+  const uid=currentUser.id;
+  const {data:rows,error}=await db.from("stores").select("id").eq("user_id",uid).eq("name",name).limit(1);
+  if(error)throw error;
+  const row=Array.isArray(rows)&&rows.length?rows[0]:null;
+  if(!row)return;
+  if(replacement){
+    const {data:replRows,error:replErr}=await db.from("stores").select("id").eq("user_id",uid).eq("name",replacement).limit(1);
+    if(replErr)throw replErr;
+    const repl=Array.isArray(replRows)&&replRows.length?replRows[0]:null;
+    if(!repl)throw new Error(`Replacement store "${replacement}" was not found.`);
+    let r=await db.from("master_items").update({default_store_id:repl.id}).eq("user_id",uid).eq("default_store_id",row.id);
+    if(r.error)throw r.error;
+    r=await db.from("shopping_trip_items").update({store_id:repl.id,store_name:replacement}).eq("user_id",uid).eq("store_id",row.id);
+    if(r.error)throw r.error;
+  } else {
+    let r=await db.from("master_items").update({default_store_id:null}).eq("user_id",uid).eq("default_store_id",row.id);
+    if(r.error)throw r.error;
+    r=await db.from("shopping_trip_items").update({store_id:null,store_name:null}).eq("user_id",uid).eq("store_id",row.id);
+    if(r.error)throw r.error;
+  }
+  // Route history is intentionally preserved under its recorded store name.
+  // The deleted store's future route can be recreated if the same name is added again.
+  const r=await db.from("stores").delete().eq("user_id",uid).eq("id",row.id);
+  if(r.error)throw r.error;
+}
+async function renameStore(oldName){
+  const next=prompt("Rename store:",oldName);
+  if(next===null)return;
+  const name=next.trim();
   if(!name||name===oldName)return;
   if(state.stores.some(st=>st.toLowerCase()===name.toLowerCase())){alert("That store already exists.");return;}
+
   state.stores=state.stores.map(st=>st===oldName?name:st);
-  for(const maps of [state.routesByStore,state.pairsByStore,state.orderStatsByStore,state.lastRoutesByStore]){if(maps[oldName]){maps[name]=maps[oldName];delete maps[oldName];}}
+  for(const maps of [state.routesByStore,state.pairsByStore,state.orderStatsByStore,state.lastRoutesByStore]){
+    if(maps[oldName]){maps[name]=maps[oldName];delete maps[oldName];}
+  }
   state.items.forEach(x=>{if(x.store===oldName)x.store=name;if(x.shopStore===oldName)x.shopStore=name;});
-  saveLocal();queueCloudSync(true);openStoreManager();
+  saveLocal();
+  openStoreManager();
+  try{
+    setSyncStatus("Syncing…");
+    await cloudRenameStore(oldName,name);
+    await syncMasterData();
+    await replaceCloudRoutes(true);
+    localDirty=false;
+    setCloudSnapshotSignature(currentUser.id,state);
+    setSyncStatus("Synced");
+  }catch(err){
+    console.error("Store rename sync error:",err);
+    setSyncStatus("Sync error");
+    alert(`Store renamed locally, but cloud sync failed.\n\n${err?.message||String(err)}`);
+  }
 }
-function deleteStore(name){
+async function deleteStore(name){
   if(state.stores.length<=1){alert("Keep at least one store.");return;}
   const assigned=state.items.filter(x=>x.store===name||x.shopStore===name);
   let replacement=null;
@@ -325,7 +400,21 @@ function deleteStore(name){
   if(replacement){state.items.forEach(x=>{if(x.store===name)x.store=replacement;if(x.shopStore===name)x.shopStore=replacement;});}
   state.stores=state.stores.filter(st=>st!==name);
   delete state.routesByStore[name];delete state.pairsByStore[name];delete state.orderStatsByStore[name];delete state.lastRoutesByStore[name];
-  saveLocal();queueCloudSync(true);openStoreManager();
+  saveLocal();
+  openStoreManager();
+  try{
+    setSyncStatus("Syncing…");
+    await cloudDeleteStore(name,replacement);
+    await syncMasterData();
+    await replaceCloudRoutes(true);
+    localDirty=false;
+    setCloudSnapshotSignature(currentUser.id,state);
+    setSyncStatus("Synced");
+  }catch(err){
+    console.error("Store delete sync error:",err);
+    setSyncStatus("Sync error");
+    alert(`Store deleted locally, but cloud sync failed.\n\n${err?.message||String(err)}`);
+  }
 }
 function addCategory(){
   document.getElementById("sheet").innerHTML=`<h2>Add category</h2><p class="muted">Create a new category for your Master List. For example: Pet.</p><label class="muted" for="newCategoryName">Category name</label><input id="newCategoryName" type="text" placeholder="e.g. Pet" autocomplete="off"><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveNewCategory()">Add category</button></div>`;
