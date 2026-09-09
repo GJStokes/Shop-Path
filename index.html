@@ -683,10 +683,10 @@ async function resetBought(){
   try{
     setSyncStatus("Building your usual shop…");
 
-    // Start a genuinely fresh weekly shop. Build it from the items you have
-    // bought most frequently in each store, using up to the last 10 completed
-    // trips for that store. Items bought on at least 80% of those trips are
-    // included automatically (the app's "Every shop / Usually" behaviour).
+    // Start a genuinely fresh weekly shop. Automatic items are evaluated only
+    // against the item's own Master List default store, using up to the last 10
+    // completed trips in which that store had shopping items. An item is included
+    // when it appeared on at least 80% of those store-specific trips.
     const uid=currentUser.id;
     const tripsRes=await db.from("shopping_trips")
       .select("id,completed_at,created_at")
@@ -703,43 +703,42 @@ async function resetBought(){
       return;
     }
 
+    // Read all completed trip items, not just rows that already have a route_position.
+    // This makes frequency selection robust even if a completed trip item has no
+    // route position while still preserving the recorded store and item history.
     const itemRowsRes=await db.from("shopping_trip_items")
-      .select("trip_id,item_name,store_name,route_position")
+      .select("trip_id,item_name,store_name")
       .eq("user_id",uid)
-      .in("trip_id",trips.map(t=>t.id))
-      .not("route_position","is",null);
+      .in("trip_id",trips.map(t=>t.id));
     if(itemRowsRes.error)throw itemRowsRes.error;
     const itemRows=itemRowsRes.data||[];
     const tripTimes=new Map(trips.map(t=>[t.id,t.completed_at||t.created_at||""]));
+    const key=v=>String(v||"").trim().toLowerCase();
 
-    // Group completed trips by store, most recent first, then use the last
-    // 10 trips for each store as the frequency window.
-    const tripStoreKeys=new Map();
-    for(const row of itemRows){
-      const store=(row.store_name||"").trim();
-      if(!store)continue;
-      const key=row.trip_id+"||"+store;
-      if(!tripStoreKeys.has(key))tripStoreKeys.set(key,{tripId:row.trip_id,store});
-    }
+    // Build the recent-trip window independently for each store.
     const storeTrips={};
-    for(const {tripId,store} of tripStoreKeys.values()){
-      storeTrips[store]??=[];
-      if(!storeTrips[store].some(t=>t.id===tripId))storeTrips[store].push({id:tripId,time:tripTimes.get(tripId)||""});
+    for(const row of itemRows){
+      const storeKey=key(row.store_name);
+      if(!storeKey||!row.trip_id)continue;
+      storeTrips[storeKey]??=[];
+      if(!storeTrips[storeKey].some(t=>t.id===row.trip_id)){
+        storeTrips[storeKey].push({id:row.trip_id,time:tripTimes.get(row.trip_id)||""});
+      }
     }
-    for(const store of Object.keys(storeTrips)){
-      storeTrips[store].sort((a,b)=>new Date(b.time)-new Date(a.time));
-      storeTrips[store]=storeTrips[store].slice(0,10);
+    for(const storeKey of Object.keys(storeTrips)){
+      storeTrips[storeKey].sort((a,b)=>new Date(b.time)-new Date(a.time));
+      storeTrips[storeKey]=storeTrips[storeKey].slice(0,10);
     }
 
     const selectedNames=new Set();
-    const activeStoreSet=new Set(state.stores||[]);
+    const activeStores=new Map((state.stores||[]).map(st=>[key(st),st]));
     state.items.forEach(x=>{x.selected=false;x.bought=false;});
 
     // Manual overrides are evaluated first.
     for(const item of state.items){
       const mode=item.newTripMode||"auto";
       const store=item.store||"";
-      if(mode==="always" && store && activeStoreSet.has(store)){
+      if(mode==="always" && store && activeStores.has(key(store))){
         item.selected=true;
         item.bought=false;
         item.shopStore=store;
@@ -749,38 +748,32 @@ async function resetBought(){
       }
     }
 
-    // Automatic mode: include items bought on at least 80% of the last 10 trips
-    // for the item's default store. Store frequency is strictly tied to the
-    // current Master List default store so an item can never be selected from
-    // another store's history. When selected, its weekly shopStore is reset to
-    // that same default store rather than retaining a previous week's assignment.
-    for(const [store,recentTrips] of Object.entries(storeTrips)){
-      if(!activeStoreSet.has(store)||!recentTrips.length)continue;
+    // Automatic mode: evaluate each item against its OWN default store only.
+    // This prevents history from another store from changing the item's result,
+    // and explicitly resets the weekly shop store to that default store.
+    for(const item of state.items){
+      if((item.newTripMode||"auto")!=="auto")continue;
+      const store=String(item.store||"").trim();
+      const storeKey=key(store);
+      if(!storeKey||!activeStores.has(storeKey))continue;
+      const recentTrips=storeTrips[storeKey]||[];
+      if(!recentTrips.length)continue;
       const recentIds=new Set(recentTrips.map(t=>t.id));
-      const counts=new Map();
+      const boughtTrips=new Set();
       for(const row of itemRows){
-        if(row.store_name!==store||!recentIds.has(row.trip_id)||!row.item_name)continue;
-        const name=String(row.item_name);
-        const item=state.items.find(x=>String(x.name).toLowerCase()===name.toLowerCase());
-        // Never use another store's history for an item whose default store is
-        // different. The default store is the authoritative store for Automatic.
-        if(!item || String(item.store||"").trim()!==store)continue;
-        if(!counts.has(name))counts.set(name,new Set());
-        counts.get(name).add(row.trip_id);
+        if(key(row.store_name)!==storeKey||!recentIds.has(row.trip_id)||!row.item_name)continue;
+        if(String(row.item_name).trim().toLowerCase()===String(item.name).trim().toLowerCase()){
+          boughtTrips.add(row.trip_id);
+        }
       }
-      const total=recentTrips.length;
-      for(const [name,tripSet] of counts.entries()){
-        const item=state.items.find(x=>String(x.name).toLowerCase()===name.toLowerCase());
-        if(!item || (item.newTripMode||"auto")!=="auto")continue;
-        const frequency=tripSet.size/total;
-        if(frequency<0.8)continue;
-        item.selected=true;
-        item.bought=false;
-        item.shopStore=item.store||store;
-        item.shopQty=item.usualQty||"1";
-        item.shopUnit=item.usualUnit||"each";
-        selectedNames.add(item.id);
-      }
+      const frequency=boughtTrips.size/recentTrips.length;
+      if(frequency<0.8)continue;
+      item.selected=true;
+      item.bought=false;
+      item.shopStore=store;
+      item.shopQty=item.usualQty||"1";
+      item.shopUnit=item.usualUnit||"each";
+      selectedNames.add(item.id);
     }
 
     state.routesByStore={};state.route=[];state.shopStarted=null;
