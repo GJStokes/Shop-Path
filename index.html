@@ -636,7 +636,7 @@ function renderRoute(app){
   app.innerHTML=`<div class="card"><b>How route learning works</b><p class="muted">Shop Path accumulates your actual shopping order separately for each store. Repeated ordering becomes stronger over time; the latest route is used only to break ties.</p></div>${sections}<button class="primary" onclick="clearRoute()">Clear learned routes</button>`;
 }
 
-function toggleSelect(id){const x=state.items.find(x=>x.id===id);if(!x)return;x.selected=!x.selected;x.bought=false;if(x.selected&&!x.shopStore)x.shopStore=x.store||"PAK'nSAVE";saveLocal();render();queueCloudSync()}
+function toggleSelect(id){const x=state.items.find(x=>x.id===id);if(!x)return;const wasSelected=!!x.selected;x.selected=!x.selected;x.bought=false;if(!wasSelected&&x.selected){x.shopStore=x.store||x.shopStore||"PAK'nSAVE";}saveLocal();render();queueCloudSync()}
 function selectAll(v){state.items.forEach(x=>{if(!v)x.selected=false;x.bought=false});saveLocal();render();queueCloudSync()}
 function removeFromWeek(id){
   const x=state.items.find(item=>item.id===id);
