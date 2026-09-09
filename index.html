@@ -750,7 +750,10 @@ async function resetBought(){
     }
 
     // Automatic mode: include items bought on at least 80% of the last 10 trips
-    // for the item's default store.
+    // for the item's default store. Store frequency is strictly tied to the
+    // current Master List default store so an item can never be selected from
+    // another store's history. When selected, its weekly shopStore is reset to
+    // that same default store rather than retaining a previous week's assignment.
     for(const [store,recentTrips] of Object.entries(storeTrips)){
       if(!activeStoreSet.has(store)||!recentTrips.length)continue;
       const recentIds=new Set(recentTrips.map(t=>t.id));
@@ -758,6 +761,10 @@ async function resetBought(){
       for(const row of itemRows){
         if(row.store_name!==store||!recentIds.has(row.trip_id)||!row.item_name)continue;
         const name=String(row.item_name);
+        const item=state.items.find(x=>String(x.name).toLowerCase()===name.toLowerCase());
+        // Never use another store's history for an item whose default store is
+        // different. The default store is the authoritative store for Automatic.
+        if(!item || String(item.store||"").trim()!==store)continue;
         if(!counts.has(name))counts.set(name,new Set());
         counts.get(name).add(row.trip_id);
       }
@@ -769,7 +776,7 @@ async function resetBought(){
         if(frequency<0.8)continue;
         item.selected=true;
         item.bought=false;
-        item.shopStore=store;
+        item.shopStore=item.store||store;
         item.shopQty=item.usualQty||"1";
         item.shopUnit=item.usualUnit||"each";
         selectedNames.add(item.id);
