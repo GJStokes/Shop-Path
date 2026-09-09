@@ -77,7 +77,7 @@ function freshState(){
   return {
     items:BASE_ITEMS.map(x=>({...x,store:"PAK'nSAVE",shopStore:"PAK'nSAVE",selected:false,bought:false})),
     route:[],pairs:{},shopStarted:null,stores:[...DEFAULT_STORES],categories:[],
-    routesByStore:{},pairsByStore:{},lastRoutesByStore:{},orderStatsByStore:{}
+    routesByStore:{},pairsByStore:{},lastRoutesByStore:{},orderStatsByStore:{},listPathSessionId:null,listPathSessionOrder:[],listPathStats:{}
   };
 }
 function loadLocal(){
@@ -127,6 +127,9 @@ function normalizeState(){
   state.pairsByStore=state.pairsByStore&&typeof state.pairsByStore==='object'?state.pairsByStore:{};
   state.lastRoutesByStore=state.lastRoutesByStore&&typeof state.lastRoutesByStore==='object'?state.lastRoutesByStore:{};
   state.orderStatsByStore=state.orderStatsByStore&&typeof state.orderStatsByStore==='object'?state.orderStatsByStore:{};
+  state.listPathSessionId=state.listPathSessionId||null;
+  state.listPathSessionOrder=Array.isArray(state.listPathSessionOrder)?state.listPathSessionOrder:[];
+  state.listPathStats=state.listPathStats&&typeof state.listPathStats==='object'?state.listPathStats:{};
   // Do not auto-add DEFAULT_STORES here. Stores can be intentionally deleted.
   state.items.forEach(x=>{
     x.category="";
@@ -140,6 +143,20 @@ function normalizeState(){
     if(!x.shopUnit)x.shopUnit=x.usualUnit;
   });
 }
+function newListPathSessionId(){try{return crypto.randomUUID();}catch(e){return String(Date.now())+"-"+Math.random().toString(16).slice(2);}}
+function recordListPathAddition(id){
+  const item=state.items.find(x=>x.id===id);
+  if(!item)return;
+  if(!state.listPathSessionId)state.listPathSessionId=newListPathSessionId();
+  const order=state.listPathSessionOrder||[];
+  if(order.includes(id))return;
+  // Learn deliberately-added item order only. New Trip's automatically seeded
+  // items never enter this order unless the user later adds them manually.
+  order.push(id);
+  state.listPathSessionOrder=order;
+  saveLocal();
+}
+function resetListPathSession(){state.listPathSessionId=newListPathSessionId();state.listPathSessionOrder=[];}
 function saveLocal(){localStorage.setItem(KEY,JSON.stringify(state));localDirty=true;}
 function cloneState(value){return JSON.parse(JSON.stringify(value));}
 function migrationBackupKey(uid){return KEY+"-migration-backup-"+uid;}
@@ -633,8 +650,8 @@ function renderRoute(app){
   app.innerHTML=`<div class="card"><b>How route learning works</b><p class="muted">Shop Path accumulates your actual shopping order separately for each store. Repeated ordering becomes stronger over time; the latest route is used only to break ties.</p></div>${sections}<button class="primary" onclick="clearRoute()">Clear learned routes</button>`;
 }
 
-function toggleSelect(id){const x=state.items.find(x=>x.id===id);if(!x)return;const wasSelected=!!x.selected;x.selected=!x.selected;x.bought=false;if(!wasSelected&&x.selected){x.shopStore=x.store||x.shopStore||"PAK'nSAVE";}saveLocal();render();queueCloudSync()}
-function selectAll(v){state.items.forEach(x=>{if(!v)x.selected=false;x.bought=false});saveLocal();render();queueCloudSync()}
+function toggleSelect(id){const x=state.items.find(x=>x.id===id);if(!x)return;const wasSelected=!!x.selected;x.selected=!x.selected;x.bought=false;if(!wasSelected&&x.selected){x.shopStore=x.store||x.shopStore||"PAK'nSAVE";recordListPathAddition(id);}saveLocal();render();queueCloudSync()}
+function selectAll(v){state.items.forEach(x=>{if(!v)x.selected=false;x.bought=false});if(!v)resetListPathSession();saveLocal();render();queueCloudSync()}
 function removeFromWeek(id){
   const x=state.items.find(item=>item.id===id);
   if(!x)return;
@@ -672,8 +689,13 @@ function buy(id){
       state.orderStatsByStore[st]=stats;
       state.lastRoutesByStore[st]=[...clean];
     }
+    const completedListPathSessionId=state.listPathSessionId;
+    const completedListPathOrder=[...(state.listPathSessionOrder||[])];
     state.items.forEach(x=>{if(x.selected&&x.bought){x.selected=false;x.bought=false}});
-    state.routesByStore={};state.route=[];state.shopStarted=null;saveLocal();render();queueCloudSync();syncCompletedTrip(completed).catch(console.error);return;
+    resetListPathSession();
+    state.routesByStore={};state.route=[];state.shopStarted=null;saveLocal();render();queueCloudSync();
+    syncCompletedTrip(completed,completedListPathSessionId,completedListPathOrder).catch(console.error);
+    return;
   }
   saveLocal();render();queueCloudSync();
 }
@@ -699,6 +721,7 @@ async function resetBought(){
     const trips=tripsRes.data||[];
     if(!trips.length){
       state.items.forEach(x=>{x.selected=false;x.bought=false;});
+      resetListPathSession();
       state.routesByStore={};state.route=[];state.shopStarted=null;
       saveLocal();render();queueCloudSync();setSyncStatus("Synced");
       alert("There is no completed shopping history yet. Your new shop is empty — add items from Master List.");
@@ -710,12 +733,29 @@ async function resetBought(){
     // store is tried first, while a fallback purchase elsewhere still counts
     // toward the item's household buying frequency.
     const itemRowsRes=await db.from("shopping_trip_items")
-      .select("trip_id,item_name,store_name")
+      .select("trip_id,item_name,store_name,route_position,bought")
       .eq("user_id",uid)
-      .in("trip_id",trips.map(t=>t.id));
+      .in("trip_id",trips.map(t=>t.id))
+      .eq("bought",true)
+      .not("route_position","is",null);
     if(itemRowsRes.error)throw itemRowsRes.error;
     const itemRows=itemRowsRes.data||[];
-    const recentIds=new Set(trips.map(t=>t.id));
+
+    // Only real completed trips with at least one recorded bought item count
+    // toward household frequency. Older versions could accidentally create an
+    // empty completed trip during a sync race; those must never dilute the
+    // frequency denominator.
+    const tripsWithBoughtItems=new Set(itemRows.map(row=>row.trip_id).filter(Boolean));
+    const validTrips=trips.filter(t=>tripsWithBoughtItems.has(t.id));
+    const recentIds=new Set(validTrips.map(t=>t.id));
+    if(!validTrips.length){
+      state.items.forEach(x=>{x.selected=false;x.bought=false;});
+      resetListPathSession();
+      state.routesByStore={};state.route=[];state.shopStarted=null;
+      saveLocal();render();queueCloudSync();setSyncStatus("Synced");
+      alert("There is no completed shopping history yet. Your new shop is empty — add items from Master List.");
+      return;
+    }
 
     const selectedNames=new Set();
     const activeStores=new Map((state.stores||[]).map(st=>[String(st||"").trim().toLowerCase(),st]));
@@ -729,6 +769,7 @@ async function resetBought(){
     }
 
     state.items.forEach(x=>{x.selected=false;x.bought=false;});
+    resetListPathSession();
 
     // Manual overrides are evaluated first. Always include uses the item's
     // permanent default store and normal weekly quantity/unit.
@@ -750,7 +791,7 @@ async function resetBought(){
     // of the last 10 completed trips (or all available completed trips when
     // fewer than 10 exist), regardless of which store supplied it.
     // The item's own default store remains the preferred store for this new shop.
-    const total=trips.length;
+    const total=validTrips.length;
     for(const item of state.items){
       if((item.newTripMode||"auto")!=="auto")continue;
       const store=String(item.store||"").trim();
@@ -797,7 +838,7 @@ function adjustShopQty(delta){
 }
 function saveShopItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;x.shopQty=document.getElementById("siQty").value||"1";x.shopUnit=document.getElementById("siUnit").value;let v=document.getElementById("siStore").value;if(v==="__ADD_STORE__")v=x.shopStore||x.store||"PAK'nSAVE";x.shopStore=ensureStore(v);x.selected=true;x.bought=false;saveLocal();closeModal();render();queueCloudSync()}
 function openAdd(){document.getElementById("sheet").innerHTML=`<h2>Add item</h2><label class="muted">Item name</label><input id="aiName" placeholder="e.g. Apples"><label class="muted">Default store</label><select id="aiStore">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}">${esc(st)}</option>`).join("")}<option value="__ADD_STORE__">＋ Add new store…</option></select><button class="secondary" type="button" onclick="addStoreFromField('aiStore')">＋ Add new store</button><label class="muted">Usual quantity</label><input id="aiQty" type="number" min="0" step="any" value="1"><label class="muted">Unit</label><select id="aiUnit">${UNITS.map(u=>`<option>${u}</option>`).join("")}</select><label class="muted">New trip behaviour</label><select id="aiNewTripMode"><option value="auto">Automatic — use buying frequency</option><option value="always">Always include</option><option value="never">Never include</option></select><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="addItem()">Add item</button></div>`;openModal()}
-function addItem(){const name=document.getElementById("aiName").value.trim();if(!name){alert("Please enter an item name.");return}if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){alert("That item already exists.");return}let store=document.getElementById("aiStore").value;if(store==="__ADD_STORE__")store="PAK'nSAVE";store=ensureStore(store);const q=document.getElementById("aiQty").value||"1",u=document.getElementById("aiUnit").value;state.items.push({id:name,name,store,shopStore:store,usualQty:q,usualUnit:u,shopQty:q,shopUnit:u,selected:true,bought:false,category:"",newTripMode:document.getElementById("aiNewTripMode")?.value||"auto"});saveLocal();closeModal();render();queueCloudSync()}
+function addItem(){const name=document.getElementById("aiName").value.trim();if(!name){alert("Please enter an item name.");return}if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){alert("That item already exists.");return}let store=document.getElementById("aiStore").value;if(store==="__ADD_STORE__")store="PAK'nSAVE";store=ensureStore(store);const q=document.getElementById("aiQty").value||"1",u=document.getElementById("aiUnit").value;state.items.push({id:name,name,store,shopStore:store,usualQty:q,usualUnit:u,shopQty:q,shopUnit:u,selected:true,bought:false,category:"",newTripMode:document.getElementById("aiNewTripMode")?.value||"auto"});recordListPathAddition(name);saveLocal();closeModal();render();queueCloudSync()}
 async function deleteItem(id){
   const x=state.items.find(item=>item.id===id);
   if(!x)return;
@@ -870,7 +911,7 @@ function saveEdit(id){
   if(!x.selected){x.shopQty=x.usualQty; x.shopUnit=x.usualUnit;}
   saveLocal(); closeModal(); render(); queueCloudSync();
 }
-function remoteHasData(remote){return remote.items.length>0||remote.categories.length>0||remote.stores.length>0||remote.routes.length>0||remote.pairs.length>0}
+function remoteHasData(remote){return remote.items.length>0||remote.categories.length>0||remote.stores.length>0||remote.routes.length>0||remote.pairs.length>0||remote.listPath.length>0}
 function localHasAnythingBeyondFresh(){
   if(!state)return false;
   const fresh=freshState();
@@ -914,6 +955,9 @@ function mergeLocalIntoCurrent(localSnapshot){
   state.route=localState.route?.length?cloneState(localState.route):cloneState(remoteState.route||[]);
   state.pairs=localState.pairs&&Object.keys(localState.pairs).length?cloneState(localState.pairs):cloneState(remoteState.pairs||{});
   state.shopStarted=localState.shopStarted||remoteState.shopStarted||null;
+  state.listPathStats=cloneState(remoteState.listPathStats||localState.listPathStats||{});
+  state.listPathSessionId=localState.listPathSessionId||remoteState.listPathSessionId||null;
+  state.listPathSessionOrder=localState.listPathSessionOrder?.length?cloneState(localState.listPathSessionOrder):cloneState(remoteState.listPathSessionOrder||[]);
   // For the current week's selection, preserve local choices but don't throw away
   // an open cloud shopping trip that the other device may already have.
   const remoteByName=Object.fromEntries((remoteState.items||[]).map(x=>[String(x.name).toLowerCase(),x]));
@@ -1072,9 +1116,13 @@ async function downloadIntoLocal(remote){
   state.items=(remote.items||[]).sort((a,b)=>a.sort_order-b.sort_order).map(x=>({id:x.name,name:x.name,category:"",store:storeById[x.default_store_id]||fallbackStore,shopStore:storeById[x.default_store_id]||fallbackStore,usualQty:String(x.usual_quantity??1),usualUnit:x.usual_unit||"each",shopQty:String(x.usual_quantity??1),shopUnit:x.usual_unit||"each",selected:false,bought:false,newTripMode:x.new_trip_mode||"auto"}));
   // Restore most recent open shopping trip, if there is one.
   const openTrip=(remote.trips||[]).find(t=>t.status==="open");
-  if(openTrip){const {data:tripItems,error}=await db.from("shopping_trip_items").select("item_name,quantity,unit,store_name,bought,route_position").eq("trip_id",openTrip.id).eq("user_id",uid);if(error)throw error;for(const row of (tripItems||[])){const x=state.items.find(i=>i.name===row.item_name);if(x){x.selected=true;x.bought=!!row.bought;x.shopQty=String(row.quantity);x.shopUnit=row.unit||x.shopUnit;x.shopStore=row.store_name||x.store}}}
+  resetListPathSession();
+  if(openTrip)state.listPathSessionId=openTrip.id;
+  if(openTrip){const {data:tripItems,error}=await db.from("shopping_trip_items").select("item_name,quantity,unit,store_name,bought,route_position,list_position").eq("trip_id",openTrip.id).eq("user_id",uid);if(error)throw error;for(const row of (tripItems||[])){const x=state.items.find(i=>i.name===row.item_name);if(x){x.selected=true;x.bought=!!row.bought;x.shopQty=String(row.quantity);x.shopUnit=row.unit||x.shopUnit;x.shopStore=row.store_name||x.store;if(Number.isInteger(row.list_position)&&row.list_position>0)state.listPathSessionOrder[row.list_position-1]=x.id;}}}
+  state.listPathSessionOrder=state.listPathSessionOrder.filter(Boolean);
   state.orderStatsByStore={};for(const row of remote.pairs){state.orderStatsByStore[row.store_name]??={};state.orderStatsByStore[row.store_name][row.item_a_name+"|"+row.item_b_name]=row.observations}
   state.lastRoutesByStore={};for(const row of remote.routes)state.lastRoutesByStore[row.store_name]=Array.isArray(row.route_items)?row.route_items:[];
+  state.listPathStats={};for(const row of (remote.listPath||[])){const k=String(row.item_a_name||"")+"|"+String(row.item_b_name||"");if(k!=="|")state.listPathStats[k]=(state.listPathStats[k]||0)+1;}
   state.routesByStore={};state.pairsByStore={};state.route=[];state.pairs={};state.shopStarted=null;
   normalizeState();saveLocal();localDirty=false;
   setCloudSnapshotSignature(uid,state);
@@ -1099,7 +1147,8 @@ async function fetchRemoteState(){
     db.from("master_items").select("id,name,category_id,default_store_id,usual_quantity,usual_unit,new_trip_mode,sort_order").eq("user_id",uid).order("sort_order",{ascending:true}),
     db.from("shopping_trips").select("id,status,started_at,completed_at,created_at,updated_at").eq("user_id",uid).order("created_at",{ascending:false}),
     db.from("route_pairs").select("id,store_name,item_a_name,item_b_name,observations,last_observed_at").eq("user_id",uid),
-    db.from("latest_store_routes").select("id,store_name,trip_id,route_items,completed_at").eq("user_id",uid)
+    db.from("latest_store_routes").select("id,store_name,trip_id,route_items,completed_at").eq("user_id",uid),
+    db.from("list_path_observations").select("id,session_id,item_a_name,item_b_name,observed_at").eq("user_id",uid)
   ]);
   let result;
   for(let attempt=0;attempt<3;attempt++){
@@ -1110,36 +1159,67 @@ async function fetchRemoteState(){
     if(!futureJwt||attempt===2)throw err;
     await new Promise(resolve=>setTimeout(resolve,700*(attempt+1)));
   }
-  const [cats,stores,items,trips,pairs,routes]=result;
-  for(const response of [cats,stores,items,trips,pairs,routes]) if(response.error) throw response.error;
+  const [cats,stores,items,trips,pairs,routes,listPath]=result;
+  for(const response of [cats,stores,items,trips,pairs,routes,listPath]) if(response.error) throw response.error;
   return {
     categories:cats.data||[],
     stores:stores.data||[],
     items:items.data||[],
     trips:trips.data||[],
     pairs:pairs.data||[],
-    routes:routes.data||[]
+    routes:routes.data||[],
+    listPath:listPath.data||[]
   };
 }
 
 async function syncOpenTrip(){
   const uid=currentUser.id; const selected=state.items.filter(x=>x.selected);
   const {data:existing,error:e}=await db.from("shopping_trips").select("id").eq("user_id",uid).eq("status","open").order("created_at",{ascending:false}).limit(1);if(e)throw e;
-  if(!selected.length){if(existing?.[0]){const del=await db.from("shopping_trip_items").delete().eq("trip_id",existing[0].id).eq("user_id",uid);if(del.error)throw del.error;const upd=await db.from("shopping_trips").update({status:"completed",completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",existing[0].id).eq("user_id",uid);if(upd.error)throw upd.error}return}
+  if(!selected.length){
+    // An empty open trip is not a completed shopping trip. Remove it rather than
+    // converting it into a completed row that would dilute New Trip frequency.
+    if(existing?.[0]){
+      const del=await db.from("shopping_trip_items").delete().eq("trip_id",existing[0].id).eq("user_id",uid);
+      if(del.error)throw del.error;
+      const drop=await db.from("shopping_trips").delete().eq("id",existing[0].id).eq("user_id",uid);
+      if(drop.error)throw drop.error;
+    }
+    return;
+  }
   let tripId=existing?.[0]?.id; if(!tripId){const ins=await db.from("shopping_trips").insert({user_id:uid,status:"open",started_at:new Date().toISOString()}).select("id").single();if(ins.error)throw ins.error;tripId=ins.data.id}
+  if(!state.listPathSessionId||state.listPathSessionId!==tripId)state.listPathSessionId=tripId;
   const d=await db.from("shopping_trip_items").delete().eq("trip_id",tripId).eq("user_id",uid);if(d.error)throw d.error;
-  const rows=selected.map((x,i)=>({trip_id:tripId,user_id:uid,master_item_id:null,item_name:x.name,quantity:Number(x.shopQty)||1,unit:x.shopUnit||"each",store_name:x.shopStore||x.store,bought:!!x.bought,bought_at:x.bought?new Date().toISOString():null,route_position:null}));
+  const listPositions=new Map((state.listPathSessionOrder||[]).map((id,i)=>[id,i+1]));
+  const rows=selected.map((x,i)=>({trip_id:tripId,user_id:uid,master_item_id:null,item_name:x.name,quantity:Number(x.shopQty)||1,unit:x.shopUnit||"each",store_name:x.shopStore||x.store,bought:!!x.bought,bought_at:x.bought?new Date().toISOString():null,route_position:null,list_position:listPositions.get(x.id)||null}));
   if(rows.length){const ins=await db.from("shopping_trip_items").insert(rows);if(ins.error)throw ins.error}
 }
-async function syncCompletedTrip(completed){
+async function syncCompletedTrip(completed,listPathSessionId=null,listPathOrder=[]){
   if(!currentUser)return;setSyncStatus("Saving completed shop…");
   const uid=currentUser.id; const {data:open,error:e}=await db.from("shopping_trips").select("id,started_at").eq("user_id",uid).eq("status","open").order("created_at",{ascending:false}).limit(1);if(e)throw e;
   const now=new Date().toISOString(); let tripId=open?.[0]?.id;
-  if(!tripId){const ins=await db.from("shopping_trips").insert({user_id:uid,status:"completed",started_at:now,completed_at:now}).select("id").single();if(ins.error)throw ins.error;tripId=ins.data.id}else{const up=await db.from("shopping_trips").update({status:"completed",completed_at:now,updated_at:now}).eq("id",tripId).eq("user_id",uid);if(up.error)throw up.error}
-  const routeRows=[];for(const [store,rawRoute] of Object.entries(completed)){const route=[...new Set((rawRoute||[]).filter(Boolean))];for(let i=0;i<route.length;i++)routeRows.push({trip_id:tripId,user_id:uid,item_name:state.items.find(x=>x.id===route[i])?.name||route[i],quantity:1,unit:"each",store_name:store,bought:true,bought_at:now,route_position:i+1});}
+  if(!tripId){const ins=await db.from("shopping_trips").insert({user_id:uid,status:"completed",started_at:now,completed_at:now}).select("id").single();if(ins.error)throw ins.error;tripId=ins.data.id;if(!listPathSessionId)listPathSessionId=tripId}else{const up=await db.from("shopping_trips").update({status:"completed",completed_at:now,updated_at:now}).eq("id",tripId).eq("user_id",uid);if(up.error)throw up.error}
+  const listPositionById=new Map((listPathOrder||[]).map((id,i)=>[id,i+1]));
+  const routeRows=[];for(const [store,rawRoute] of Object.entries(completed)){const route=[...new Set((rawRoute||[]).filter(Boolean))];for(let i=0;i<route.length;i++)routeRows.push({trip_id:tripId,user_id:uid,item_name:state.items.find(x=>x.id===route[i])?.name||route[i],quantity:1,unit:"each",store_name:store,bought:true,bought_at:now,route_position:i+1,list_position:listPositionById.get(route[i])||null});}
   const del=await db.from("shopping_trip_items").delete().eq("trip_id",tripId).eq("user_id",uid);if(del.error)throw del.error;if(routeRows.length){const ins=await db.from("shopping_trip_items").insert(routeRows);if(ins.error)throw ins.error}
+  if(listPathSessionId&&listPathOrder?.length)await syncCompletedListPath(listPathSessionId,listPathOrder);
   await replaceCloudRoutes();setSyncStatus("Synced");
 }
+async function syncCompletedListPath(sessionId,orderIds){
+  if(!currentUser||!sessionId||!Array.isArray(orderIds)||orderIds.length<2)return;
+  const uid=currentUser.id;
+  const names=[];
+  for(const id of orderIds){const item=state.items.find(x=>x.id===id);if(item?.name)names.push(item.name);}
+  const clean=[...new Set(names.filter(Boolean))];
+  if(clean.length<2)return;
+  const rows=[];
+  for(let i=0;i<clean.length;i++)for(let j=i+1;j<clean.length;j++)if(clean[i]!==clean[j])rows.push({user_id:uid,session_id:sessionId,item_a_name:clean[i],item_b_name:clean[j],observed_at:new Date().toISOString()});
+  const res=await db.from("list_path_observations").upsert(rows,{onConflict:"user_id,session_id,item_a_name,item_b_name"});
+  if(res.error)throw res.error;
+  const stats=state.listPathStats||{};
+  for(const row of rows){const k=row.item_a_name+"|"+row.item_b_name;stats[k]=(stats[k]||0)+1;}
+  state.listPathStats=stats;saveLocal();
+}
+
 async function replaceCloudRoutes(){
   const uid=currentUser.id;
 
