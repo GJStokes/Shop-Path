@@ -673,6 +673,10 @@ function buy(id){
       state.lastRoutesByStore[st]=[...clean];
     }
     state.items.forEach(x=>{if(x.selected&&x.bought){x.selected=false;x.bought=false}});
+    // Cancel any queued ordinary cloud sync before recording completion so it
+    // cannot race the authoritative completed-trip write.
+    clearTimeout(cloudSyncTimer);
+    cloudSyncTimer=null;
     state.routesByStore={};state.route=[];state.shopStarted=null;saveLocal();render();
     syncCompletedTrip(completed).catch(err=>{console.error("Complete trip sync error:",err);setSyncStatus("Sync error")});
     return;
@@ -1158,21 +1162,33 @@ async function syncOpenTrip(){
 async function syncCompletedTrip(completed){
   if(!currentUser)return;setSyncStatus("Saving completed shop…");
   const uid=currentUser.id;
-  const {data:open,error:e}=await db.from("shopping_trips").select("id,started_at").eq("user_id",uid).eq("status","open").order("created_at",{ascending:false}).limit(1);if(e)throw e;
   const now=new Date().toISOString();
-  let tripId=open?.[0]?.id;
-  if(!tripId){
-    const ins=await db.from("shopping_trips").insert({user_id:uid,status:"completed",started_at:now,completed_at:now}).select("id").single();if(ins.error)throw ins.error;tripId=ins.data.id;
-  }else{
-    const up=await db.from("shopping_trips").update({status:"completed",completed_at:now,updated_at:now}).eq("id",tripId).eq("user_id",uid);if(up.error)throw up.error;
-  }
+
+  // Completion is authoritative. Never depend on the open-trip record still
+  // existing because a queued/background sync may concurrently clear it.
+  // Create a dedicated completed trip first, then write its route rows.
+  const ins=await db.from("shopping_trips").insert({user_id:uid,status:"completed",started_at:now,completed_at:now,updated_at:now}).select("id").single();
+  if(ins.error)throw ins.error;
+  const tripId=ins.data.id;
+
   const routeRows=[];
   for(const [store,rawRoute] of Object.entries(completed)){
     const route=[...new Set((rawRoute||[]).filter(Boolean))];
     for(let i=0;i<route.length;i++)routeRows.push({trip_id:tripId,user_id:uid,item_name:state.items.find(x=>x.id===route[i])?.name||route[i],quantity:1,unit:"each",store_name:store,bought:true,bought_at:now,route_position:i+1});
   }
-  const del=await db.from("shopping_trip_items").delete().eq("trip_id",tripId).eq("user_id",uid);if(del.error)throw del.error;
-  if(routeRows.length){const ins=await db.from("shopping_trip_items").insert(routeRows);if(ins.error)throw ins.error;}
+  if(!routeRows.length)throw new Error("Cannot complete an empty shopping trip.");
+  const rowsIns=await db.from("shopping_trip_items").insert(routeRows);
+  if(rowsIns.error)throw rowsIns.error;
+
+  // Clean up any stale open trip left behind by the normal selection sync.
+  const openRows=await db.from("shopping_trips").select("id").eq("user_id",uid).eq("status","open");
+  if(openRows.error)throw openRows.error;
+  const openIds=(openRows.data||[]).map(r=>r.id).filter(Boolean);
+  if(openIds.length){
+    const di=await db.from("shopping_trip_items").delete().eq("user_id",uid).in("trip_id",openIds);if(di.error)throw di.error;
+    const dt=await db.from("shopping_trips").delete().eq("user_id",uid).in("id",openIds);if(dt.error)throw dt.error;
+  }
+
   await replaceCloudRoutes();
   setSyncStatus("Synced");
 }
