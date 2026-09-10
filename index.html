@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- Shop Path master item persistence fix: item-level updated_at sync -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -16,7 +17,7 @@ button{font:inherit}.primary{background:#111827;color:white;border:0;border-radi
 .buy{width:42px;height:42px;border-radius:12px;border:2px solid #9ca3af;background:white;font-size:20px}.buy.done{background:#111827;color:white;border-color:#111827}.qty{display:flex;align-items:center;gap:5px}.qty-stepper{display:flex;align-items:center;gap:8px;margin:5px 0 8px}.qty-stepper button{min-width:46px;height:44px;font-size:24px;line-height:1}.qty-stepper input{width:80px!important;margin:0!important;text-align:center}.qty input{width:54px;text-align:center;padding:7px;border:1px solid #d1d5db;border-radius:8px}.qty-stepper{display:flex;align-items:center;justify-content:center;gap:10px;margin:6px 0}.qty-stepper button{min-width:48px;min-height:46px;font-size:24px;line-height:1}.qty-stepper input{flex:1;max-width:120px;text-align:center;padding:11px;border:1px solid #d1d5db;border-radius:10px;font-size:18px}.qty select{padding:7px;border:1px solid #d1d5db;border-radius:8px;background:white}
 .section{margin-top:18px}.section h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}.storetag{font-size:12px;color:#374151;margin-top:3px;font-weight:600}.item-open{border:0;background:transparent;padding:0;text-align:left;cursor:pointer;flex:1}.item-open:active{opacity:.7}
 .muted{color:#6b7280;font-size:13px}.empty{padding:30px;text-align:center;color:#6b7280}.stats{display:flex;gap:8px;margin-bottom:10px}.stat{background:white;border-radius:12px;padding:10px;flex:1;text-align:center}.stat b{display:block;font-size:20px}
-.modal{position:fixed;inset:0;background:#0007;display:none;z-index:20;padding:18px}.modal.show{display:flex;align-items:flex-end}.sheet{background:white;border-radius:18px 18px 0 0;width:100%;max-height:85vh;overflow:auto;padding:16px}.sheet h2{margin-top:0}.sheet input,.sheet select{width:100%;padding:12px;margin:5px 0;border:1px solid #d1d5db;border-radius:10px;font-size:16px}.actions{display:flex;gap:8px;margin-top:10px}.actions button{flex:1}.store-list{margin:10px 0}.store-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #eee}.store-row span{flex:1;font-weight:600}.store-row button{padding:7px 10px}.store-add{display:flex;gap:8px;margin-top:12px}.store-add input{flex:1;margin:0}.store-add button{white-space:nowrap}.search-results{margin-top:18px}.search-results h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}
+.modal{position:fixed;inset:0;background:#0007;display:none;z-index:20;padding:18px}.modal.show{display:flex;align-items:flex-end}.sheet{background:white;border-radius:18px 18px 0 0;width:100%;max-height:85vh;overflow:auto;padding:16px}.sheet h2{margin-top:0}.sheet input,.sheet select{width:100%;padding:12px;margin:5px 0;border:1px solid #d1d5db;border-radius:10px;font-size:16px}.actions{display:flex;gap:8px;margin-top:10px}.actions button{flex:1}.field-group{margin:10px 0 14px}.field-label{display:block;margin:0 0 6px}.field-input{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:10px;font-size:16px}.store-list{margin:10px 0}.store-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #eee}.store-row span{flex:1;font-weight:600}.store-row button{padding:7px 10px}.store-add{display:flex;gap:8px;margin-top:12px}.store-add input{flex:1;margin:0}.store-add button{white-space:nowrap}.search-results{margin-top:18px}.search-results h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}
 #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:#f3f4f6}.auth-card{width:min(100%,430px);background:white;border-radius:20px;padding:24px;box-shadow:0 10px 35px #0002}.auth-card h2{margin:0 0 6px}.auth-card input{width:100%;padding:13px;border:1px solid #d1d5db;border-radius:10px;font-size:16px;margin:6px 0}.auth-actions{display:flex;gap:8px;margin-top:10px}.auth-actions button{flex:1}.auth-msg{min-height:24px;margin-top:10px;font-size:14px;color:#b00020}.auth-links{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap}.auth-links button{border:0;background:none;padding:0;color:#2563eb;cursor:pointer}#app-shell{display:none}#app-shell.authenticated{display:block}#auth.hidden{display:none}.topline{display:flex;align-items:center;gap:8px;margin:0 0 8px;flex-wrap:wrap}.status{font-size:12px;color:#d1d5db}.user-pill{margin-left:auto;font-size:12px;color:#d1d5db}.notice{background:#fffbeb;border:1px solid #f59e0b;padding:12px;border-radius:12px;margin:10px 0;font-size:13px}
 @media(min-width:650px){.modal.show{align-items:center;justify-content:center}.sheet{max-width:520px;border-radius:18px}}
 </style>
@@ -76,7 +77,7 @@ let view="shop";
 
 function freshState(){
   return {
-    items:BASE_ITEMS.map(x=>({...x,store:"PAK'nSAVE",shopStore:"PAK'nSAVE",selected:false,bought:false})),
+    items:BASE_ITEMS.map(x=>({...x,store:"PAK'nSAVE",shopStore:"PAK'nSAVE",selected:false,bought:false,updatedAt:null})),
     route:[],pairs:{},shopStarted:null,stores:[...DEFAULT_STORES],categories:[],
     routesByStore:{},pairsByStore:{},lastRoutesByStore:{},orderStatsByStore:{}
   };
@@ -135,6 +136,7 @@ function normalizeState(){
     if(!x.shopStore)x.shopStore=x.store;
     if(x.selected==null)x.selected=false;
     if(x.bought==null)x.bought=false;
+    if(x.updatedAt===undefined)x.updatedAt=null;
     if(x.usualQty==null)x.usualQty="1";
     if(!x.usualUnit)x.usualUnit="each";
     if(x.shopQty==null)x.shopQty=x.usualQty;
@@ -814,7 +816,7 @@ function adjustShopQty(delta){
 }
 function saveShopItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;x.shopQty=document.getElementById("siQty").value||"1";x.shopUnit=document.getElementById("siUnit").value;let v=document.getElementById("siStore").value;if(v==="__ADD_STORE__")v=x.shopStore||x.store||"PAK'nSAVE";x.shopStore=ensureStore(v);x.selected=true;x.bought=false;saveLocal();closeModal();render();queueCloudSync()}
 function openAdd(){document.getElementById("sheet").innerHTML=`<h2>Add item</h2><label class="muted">Item name</label><input id="aiName" placeholder="e.g. Apples"><label class="muted">Default store</label><select id="aiStore">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}">${esc(st)}</option>`).join("")}<option value="__ADD_STORE__">＋ Add new store…</option></select><button class="secondary" type="button" onclick="addStoreFromField('aiStore')">＋ Add new store</button><label class="muted">Usual quantity</label><input id="aiQty" type="number" min="0" step="any" value="1"><label class="muted">Unit</label><select id="aiUnit">${UNITS.map(u=>`<option>${u}</option>`).join("")}</select><label class="muted">New trip behaviour</label><select id="aiNewTripMode"><option value="auto">Automatic — use buying frequency</option><option value="always">Always include</option><option value="never">Never include</option></select><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="addItem()">Add item</button></div>`;openModal()}
-function addItem(){const name=document.getElementById("aiName").value.trim();if(!name){alert("Please enter an item name.");return}if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){alert("That item already exists.");return}let store=document.getElementById("aiStore").value;if(store==="__ADD_STORE__")store="PAK'nSAVE";store=ensureStore(store);const q=document.getElementById("aiQty").value||"1",u=document.getElementById("aiUnit").value;state.items.push({id:name,name,store,shopStore:store,usualQty:q,usualUnit:u,shopQty:q,shopUnit:u,selected:true,bought:false,category:"",newTripMode:document.getElementById("aiNewTripMode")?.value||"auto"});saveLocal();closeModal();render();queueCloudSync()}
+function addItem(){const name=document.getElementById("aiName").value.trim();if(!name){alert("Please enter an item name.");return}if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){alert("That item already exists.");return}let store=document.getElementById("aiStore").value;if(store==="__ADD_STORE__")store="PAK'nSAVE";store=ensureStore(store);const q=document.getElementById("aiQty").value||"1",u=document.getElementById("aiUnit").value;state.items.push({id:name,name,store,shopStore:store,usualQty:q,usualUnit:u,shopQty:q,shopUnit:u,selected:true,bought:false,category:"",newTripMode:document.getElementById("aiNewTripMode")?.value||"auto",updatedAt:new Date().toISOString()});saveLocal();closeModal();render();queueCloudSync()}
 async function deleteItem(id){
   const x=state.items.find(item=>item.id===id);
   if(!x)return;
@@ -855,7 +857,7 @@ async function deleteItem(id){
     setSyncStatus("Sync error");
   }
 }
-function editItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;const defaultStore=x.store||"PAK'nSAVE";const mode=x.newTripMode||"auto";document.getElementById("sheet").innerHTML=`<h2>Edit item</h2><p class="muted">Edit the item's permanent Master List settings. The store here is the <b>default store</b>. A different store for this week's shop is set separately when the item is selected.</p><label class="muted" for="eiName">Item name</label><input id="eiName" value="${esc(x.name)}"><label class="muted" for="eiStore">Default store</label><select id="eiStore">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st===defaultStore?"selected":""}>${esc(st)}</option>`).join("")}</select><button class="secondary" type="button" onclick="addStoreFromField('eiStore')">＋ Add new store</button><label class="muted" for="eiQty">Usual quantity</label><input id="eiQty" type="number" min="0" step="any" value="${esc(x.usualQty)}"><label class="muted" for="eiUnit">Unit</label><select id="eiUnit">${UNITS.map(u=>`<option value="${esc(u)}" ${u===x.usualUnit?"selected":""}>${esc(u)}</option>`).join("")}</select><label class="muted" for="eiNewTripMode">New trip behaviour</label><select id="eiNewTripMode"><option value="auto" ${mode==="auto"?"selected":""}>Automatic — use buying frequency</option><option value="always" ${mode==="always"?"selected":""}>Always include</option><option value="never" ${mode==="never"?"selected":""}>Never include</option></select><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveEdit(decodeURIComponent('${encodeURIComponent(id)}'))">Save</button></div>`;openModal()}
+function editItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;const defaultStore=x.store||"PAK'nSAVE";const mode=x.newTripMode||"auto";document.getElementById("sheet").innerHTML=`<h2>Edit item</h2><p class="muted">Edit the item's permanent Master List settings. The store here is the <b>default store</b>. A different store for this week's shop is set separately when the item is selected.</p><label class="muted" for="eiName">Item name</label><input id="eiName" value="${esc(x.name)}"><label class="muted" for="eiStore">Default store</label><select id="eiStore">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st===defaultStore?"selected":""}>${esc(st)}</option>`).join("")}</select><button class="secondary" type="button" onclick="addStoreFromField('eiStore')">＋ Add new store</button><div class="field-group"><label class="muted field-label" for="eiQty">Usual quantity</label><input id="eiQty" class="field-input" type="number" min="0" step="any" value="${esc(x.usualQty)}"></div><div class="field-group"><label class="muted field-label" for="eiUnit">Unit</label><select id="eiUnit" class="field-input">${UNITS.map(u=>`<option value="${esc(u)}" ${u===x.usualUnit?"selected":""}>${esc(u)}</option>`).join("")}</select><label class="muted" for="eiNewTripMode">New trip behaviour</label><select id="eiNewTripMode"><option value="auto" ${mode==="auto"?"selected":""}>Automatic — use buying frequency</option><option value="always" ${mode==="always"?"selected":""}>Always include</option><option value="never" ${mode==="never"?"selected":""}>Never include</option></select><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveEdit(decodeURIComponent('${encodeURIComponent(id)}'))">Save</button></div>`;openModal()}
 function saveEdit(id){
   const x=state.items.find(x=>x.id===id); if(!x)return;
   const oldName=x.name, newName=document.getElementById("eiName").value.trim();
@@ -884,6 +886,7 @@ function saveEdit(id){
   // independent and must not be overwritten by editing the default store.
   x.shopStore=previousShopStore || x.shopStore || x.store;
   x.usualQty=document.getElementById("eiQty").value||"1"; x.usualUnit=document.getElementById("eiUnit").value; x.newTripMode=document.getElementById("eiNewTripMode")?.value||"auto";
+  x.updatedAt=new Date().toISOString();
   if(!x.selected){x.shopQty=x.usualQty; x.shopUnit=x.usualUnit;}
   saveLocal(); closeModal(); render(); queueCloudSync();
 }
@@ -906,8 +909,18 @@ function mergeLocalIntoCurrent(localSnapshot){
   state.categories=[];
   state.stores=mergeUniqueNames(remoteState.stores,localState.stores);
   const byName=new Map();
+  const pickNewerItem=(remoteItem,localItem)=>{
+    if(!remoteItem)return cloneState(localItem);
+    if(!localItem)return cloneState(remoteItem);
+    const rt=remoteItem.updatedAt?new Date(remoteItem.updatedAt).getTime():0;
+    const lt=localItem.updatedAt?new Date(localItem.updatedAt).getTime():0;
+    if(lt>rt)return cloneState(localItem);
+    if(rt>lt)return cloneState(remoteItem);
+    // Legacy items without timestamps keep the local copy during migration.
+    return cloneState(localItem);
+  };
   for(const item of remoteState.items||[])byName.set(String(item.name).toLowerCase(),cloneState(item));
-  for(const item of localState.items||[])byName.set(String(item.name).toLowerCase(),cloneState(item));
+  for(const item of localState.items||[]){const key=String(item.name).toLowerCase();byName.set(key,pickNewerItem(byName.get(key),item));}
   state.items=[...byName.values()];
   state.items.forEach(x=>{
     x.category="";
@@ -915,7 +928,7 @@ function mergeLocalIntoCurrent(localSnapshot){
     if(!x.shopStore)x.shopStore=x.store;
     if(x.usualQty==null)x.usualQty='1'; if(!x.usualUnit)x.usualUnit='each';
     if(x.shopQty==null)x.shopQty=x.usualQty; if(!x.shopUnit)x.shopUnit=x.usualUnit;
-    if(x.selected==null)x.selected=false; if(x.bought==null)x.bought=false;
+    if(x.selected==null)x.selected=false; if(x.bought==null)x.bought=false; if(x.updatedAt===undefined)x.updatedAt=null;
   });
   const mergedStats={};
   for(const source of [remoteState.orderStatsByStore,localState.orderStatsByStore]){
@@ -1086,7 +1099,7 @@ async function downloadIntoLocal(remote){
   state.categories=[];
   state.stores=remote.stores.length?remote.stores.sort((a,b)=>a.sort_order-b.sort_order).map(x=>x.name):[];
     const fallbackStore=state.stores[0]||"";
-  state.items=(remote.items||[]).sort((a,b)=>a.sort_order-b.sort_order).map(x=>({id:x.name,name:x.name,category:"",store:storeById[x.default_store_id]||fallbackStore,shopStore:storeById[x.default_store_id]||fallbackStore,usualQty:String(x.usual_quantity??1),usualUnit:x.usual_unit||"each",shopQty:String(x.usual_quantity??1),shopUnit:x.usual_unit||"each",selected:false,bought:false,newTripMode:x.new_trip_mode||"auto"}));
+  state.items=(remote.items||[]).sort((a,b)=>a.sort_order-b.sort_order).map(x=>({id:x.name,name:x.name,category:"",store:storeById[x.default_store_id]||fallbackStore,shopStore:storeById[x.default_store_id]||fallbackStore,usualQty:String(x.usual_quantity??1),usualUnit:x.usual_unit||"each",shopQty:String(x.usual_quantity??1),shopUnit:x.usual_unit||"each",selected:false,bought:false,newTripMode:x.new_trip_mode||"auto",updatedAt:x.updated_at||null}));
   // Restore most recent open shopping trip, if there is one.
   const openTrip=(remote.trips||[]).find(t=>t.status==="open");
   if(openTrip){const {data:tripItems,error}=await db.from("shopping_trip_items").select("item_name,quantity,unit,store_name,bought,route_position").eq("trip_id",openTrip.id).eq("user_id",uid);if(error)throw error;for(const row of (tripItems||[])){const x=state.items.find(i=>i.name===row.item_name);if(x){x.selected=true;x.bought=!!row.bought;x.shopQty=String(row.quantity);x.shopUnit=row.unit||x.shopUnit;x.shopStore=row.store_name||x.store}}}
@@ -1312,7 +1325,15 @@ async function syncMasterData(){
   const safeStores=Array.isArray(stores2)?stores2:[];
   const storeMap=Object.fromEntries(safeStores.map(x=>[String(x.name||"").trim().toLowerCase(),x.id]));
 
-  const rows=state.items.map((x,i)=>({
+  // Master List item sync is item-aware. A device may be behind another device,
+  // so never let an older local copy overwrite a newer cloud item.
+  const remoteRes=await db.from("master_items")
+    .select("id,name,default_store_id,usual_quantity,usual_unit,new_trip_mode,sort_order,updated_at")
+    .eq("user_id",uid);
+  if(remoteRes.error)throw remoteRes.error;
+  const remoteByName=new Map((remoteRes.data||[]).map(row=>[String(row.name||"").trim().toLowerCase(),row]));
+
+  const candidateRows=state.items.map((x,i)=>({
     user_id:uid,
     name:x.name,
     category_id:null,
@@ -1320,24 +1341,45 @@ async function syncMasterData(){
     usual_quantity:Number(x.usualQty)||1,
     usual_unit:x.usualUnit||"each",
     new_trip_mode:["auto","always","never"].includes(x.newTripMode)?x.newTripMode:"auto",
-    sort_order:i
+    sort_order:i,
+    updated_at:x.updatedAt||null
   }));
-  const unresolved=rows.filter(row=>!row.default_store_id);
+  const unresolved=candidateRows.filter(row=>!row.default_store_id);
   if(unresolved.length)throw new Error(`One or more items are missing a valid default store: ${unresolved.map(r=>r.name).join(", ")}`);
-  r=await db.from("master_items").upsert(rows,{onConflict:"user_id,name"});
-  if(r.error)throw r.error;
 
-  const {data:ritems,error:ri}=await db.from("master_items").select("id,name").eq("user_id",uid);
-  if(ri)throw ri;
-  const safeItems=Array.isArray(ritems)?ritems:[];
-  const localItemNames=new Set(state.items.map(i=>i.name));
-  const deadItems=safeItems.filter(x=>!localItemNames.has(x.name));
-  if(deadItems.length){
-    r=await db.from("master_items").delete().in("id",deadItems.map(x=>x.id));
+  const rowsToUpsert=[];
+  for(const row of candidateRows){
+    const key=String(row.name).trim().toLowerCase();
+    const remote=remoteByName.get(key);
+    if(!remote){
+      rowsToUpsert.push({...row,updated_at:row.updated_at||new Date().toISOString()});
+      const local=state.items.find(x=>String(x.name).trim().toLowerCase()===key);
+      if(local&&!local.updatedAt)local.updatedAt=rowsToUpsert[rowsToUpsert.length-1].updated_at;
+      continue;
+    }
+    const localTs=row.updated_at?new Date(row.updated_at).getTime():0;
+    const remoteTs=remote.updated_at?new Date(remote.updated_at).getTime():0;
+    // Only write when the local item is newer, or when the remote record is legacy
+    // and has no timestamp. Equal/older local state is left untouched in the cloud.
+    if(localTs>remoteTs || (remoteTs===0 && localTs>0))rowsToUpsert.push(row);
+  }
+
+  if(rowsToUpsert.length){
+    r=await db.from("master_items").upsert(rowsToUpsert,{onConflict:"user_id,name"});
     if(r.error)throw r.error;
   }
+
+  // Refresh the remote index after writes so the deletion check never treats a
+  // newer cloud-created item as stale merely because this device has not pulled it yet.
+  const {data:ritems,error:ri}=await db.from("master_items").select("id,name,updated_at").eq("user_id",uid);
+  if(ri)throw ri;
+  // Deliberate item deletion is still handled by deleteItem(), which performs the
+  // cloud deletion directly. Therefore normal sync must not delete any remote item.
+  // This prevents a stale device from deleting a newly-added item.
+
   await syncOpenTrip();
 }
+
 async function syncToCloud(forceRoutes=false){if(!currentUser||!cloudReady||syncing||completionInProgress)return false;syncing=true;try{setSyncStatus("Syncing…");await syncMasterData();if(forceRoutes)await replaceCloudRoutes();localDirty=false;setCloudSnapshotSignature(currentUser.id,state);deviceLocalDataAvailable=false;setSyncStatus("Synced");return true}catch(err){console.error(err);setSyncStatus("Sync error");return false}finally{syncing=false}}
 async function syncNow(){
   if(!currentUser||!cloudReady||syncing)return;
