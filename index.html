@@ -1092,9 +1092,32 @@ async function downloadIntoLocal(remote){
   state.stores=remote.stores.length?remote.stores.sort((a,b)=>a.sort_order-b.sort_order).map(x=>x.name):[];
     const fallbackStore=state.stores[0]||"";
   state.items=(remote.items||[]).sort((a,b)=>a.sort_order-b.sort_order).map(x=>({id:x.name,name:x.name,category:"",store:storeById[x.default_store_id]||fallbackStore,shopStore:storeById[x.default_store_id]||fallbackStore,usualQty:String(x.usual_quantity??1),usualUnit:x.usual_unit||"each",shopQty:String(x.usual_quantity??1),shopUnit:x.usual_unit||"each",selected:false,bought:false,newTripMode:x.new_trip_mode||"auto",updatedAt:x.updated_at||null}));
-  // Restore most recent open shopping trip, if there is one.
+  // Restore the most recent genuinely active open shopping trip, if there is one.
+  // A stale open trip can remain briefly around completion because another sync may
+  // have written it before the final Bought tap. Never resurrect a trip whose
+  // items are already all bought; completion has already cleared it locally.
   const openTrip=(remote.trips||[]).find(t=>t.status==="open");
-  if(openTrip){const {data:tripItems,error}=await db.from("shopping_trip_items").select("item_name,quantity,unit,store_name,bought,route_position").eq("trip_id",openTrip.id).eq("user_id",uid);if(error)throw error;for(const row of (tripItems||[])){const x=state.items.find(i=>i.name===row.item_name);if(x){x.selected=true;x.bought=!!row.bought;x.shopQty=String(row.quantity);x.shopUnit=row.unit||x.shopUnit;x.shopStore=row.store_name||x.store}}}
+  if(openTrip){
+    const {data:tripItems,error}=await db.from("shopping_trip_items")
+      .select("item_name,quantity,unit,store_name,bought,route_position")
+      .eq("trip_id",openTrip.id).eq("user_id",uid);
+    if(error)throw error;
+    const rows=tripItems||[];
+    const hasUnbought=rows.some(row=>!row.bought);
+    if(hasUnbought){
+      for(const row of rows){
+        const x=state.items.find(i=>i.name===row.item_name);
+        if(x){x.selected=true;x.bought=!!row.bought;x.shopQty=String(row.quantity);x.shopUnit=row.unit||x.shopUnit;x.shopStore=row.store_name||x.shopStore}
+      }
+    }else{
+      // Defensive cleanup: an open trip with no remaining items is stale and must
+      // never be allowed to repopulate This Week on another device.
+      const delItems=await db.from("shopping_trip_items").delete().eq("trip_id",openTrip.id).eq("user_id",uid);
+      if(delItems.error)throw delItems.error;
+      const delTrip=await db.from("shopping_trips").delete().eq("id",openTrip.id).eq("user_id",uid);
+      if(delTrip.error)throw delTrip.error;
+    }
+  }
   state.orderStatsByStore={};for(const row of remote.pairs){state.orderStatsByStore[row.store_name]??={};state.orderStatsByStore[row.store_name][row.item_a_name+"|"+row.item_b_name]=row.observations}
   state.lastRoutesByStore={};for(const row of remote.routes)state.lastRoutesByStore[row.store_name]=Array.isArray(row.route_items)?row.route_items:[];
   state.routesByStore={};state.pairsByStore={};state.route=[];state.pairs={};state.shopStarted=null;
