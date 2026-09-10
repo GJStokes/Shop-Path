@@ -69,6 +69,7 @@ let currentUser=null;
 let cloudSyncTimer=null;
 let cloudReady=false;
 let syncing=false;
+let completionInProgress=false;
 let localDirty=false;
 let deviceLocalDataAvailable=false;
 let view="shop";
@@ -673,8 +674,9 @@ function buy(id){
       state.lastRoutesByStore[st]=[...clean];
     }
     state.items.forEach(x=>{if(x.selected&&x.bought){x.selected=false;x.bought=false}});
-    // Cancel any queued ordinary cloud sync before recording completion so it
-    // cannot race the authoritative completed-trip write.
+    // Completion is authoritative. Block ordinary background syncing while the
+    // completed trip is being committed, and cancel any queued sync first.
+    completionInProgress=true;
     clearTimeout(cloudSyncTimer);
     cloudSyncTimer=null;
     state.routesByStore={};state.route=[];state.shopStarted=null;saveLocal();render();
@@ -1160,37 +1162,45 @@ async function syncOpenTrip(){
   if(rows.length){const ins=await db.from("shopping_trip_items").insert(rows);if(ins.error)throw ins.error}
 }
 async function syncCompletedTrip(completed){
-  if(!currentUser)return;setSyncStatus("Saving completed shop…");
-  const uid=currentUser.id;
-  const now=new Date().toISOString();
-
-  // Completion is authoritative. Never depend on the open-trip record still
-  // existing because a queued/background sync may concurrently clear it.
-  // Create a dedicated completed trip first, then write its route rows.
-  const ins=await db.from("shopping_trips").insert({user_id:uid,status:"completed",started_at:now,completed_at:now,updated_at:now}).select("id").single();
-  if(ins.error)throw ins.error;
-  const tripId=ins.data.id;
-
-  const routeRows=[];
-  for(const [store,rawRoute] of Object.entries(completed)){
-    const route=[...new Set((rawRoute||[]).filter(Boolean))];
-    for(let i=0;i<route.length;i++)routeRows.push({trip_id:tripId,user_id:uid,item_name:state.items.find(x=>x.id===route[i])?.name||route[i],quantity:1,unit:"each",store_name:store,bought:true,bought_at:now,route_position:i+1});
+  if(!currentUser){completionInProgress=false;return;}
+  // Wait for any ordinary sync that was already in flight when the final item
+  // was bought. New ordinary syncs are blocked by completionInProgress.
+  while(syncing){await new Promise(resolve=>setTimeout(resolve,100));}
+  setSyncStatus("Saving completed shop…");
+  try{
+    const uid=currentUser.id;
+    const now=new Date().toISOString();
+  
+    // Completion is authoritative. Never depend on the open-trip record still
+    // existing because a queued/background sync may concurrently clear it.
+    // Create a dedicated completed trip first, then write its route rows.
+    const ins=await db.from("shopping_trips").insert({user_id:uid,status:"completed",started_at:now,completed_at:now,updated_at:now}).select("id").single();
+    if(ins.error)throw ins.error;
+    const tripId=ins.data.id;
+  
+    const routeRows=[];
+    for(const [store,rawRoute] of Object.entries(completed)){
+      const route=[...new Set((rawRoute||[]).filter(Boolean))];
+      for(let i=0;i<route.length;i++)routeRows.push({trip_id:tripId,user_id:uid,item_name:state.items.find(x=>x.id===route[i])?.name||route[i],quantity:1,unit:"each",store_name:store,bought:true,bought_at:now,route_position:i+1});
   }
-  if(!routeRows.length)throw new Error("Cannot complete an empty shopping trip.");
-  const rowsIns=await db.from("shopping_trip_items").insert(routeRows);
-  if(rowsIns.error)throw rowsIns.error;
-
-  // Clean up any stale open trip left behind by the normal selection sync.
-  const openRows=await db.from("shopping_trips").select("id").eq("user_id",uid).eq("status","open");
-  if(openRows.error)throw openRows.error;
-  const openIds=(openRows.data||[]).map(r=>r.id).filter(Boolean);
-  if(openIds.length){
-    const di=await db.from("shopping_trip_items").delete().eq("user_id",uid).in("trip_id",openIds);if(di.error)throw di.error;
-    const dt=await db.from("shopping_trips").delete().eq("user_id",uid).in("id",openIds);if(dt.error)throw dt.error;
+    if(!routeRows.length)throw new Error("Cannot complete an empty shopping trip.");
+    const rowsIns=await db.from("shopping_trip_items").insert(routeRows);
+    if(rowsIns.error)throw rowsIns.error;
+  
+    // Clean up any stale open trip left behind by the normal selection sync.
+    const openRows=await db.from("shopping_trips").select("id").eq("user_id",uid).eq("status","open");
+    if(openRows.error)throw openRows.error;
+    const openIds=(openRows.data||[]).map(r=>r.id).filter(Boolean);
+    if(openIds.length){
+      const di=await db.from("shopping_trip_items").delete().eq("user_id",uid).in("trip_id",openIds);if(di.error)throw di.error;
+      const dt=await db.from("shopping_trips").delete().eq("user_id",uid).in("id",openIds);if(dt.error)throw dt.error;
   }
-
-  await replaceCloudRoutes();
-  setSyncStatus("Synced");
+  
+    await replaceCloudRoutes();
+    setSyncStatus("Synced");
+  } finally {
+    completionInProgress=false;
+  }
 }
 
 async function replaceCloudRoutes(){
@@ -1328,7 +1338,7 @@ async function syncMasterData(){
   }
   await syncOpenTrip();
 }
-async function syncToCloud(forceRoutes=false){if(!currentUser||!cloudReady||syncing)return false;syncing=true;try{setSyncStatus("Syncing…");await syncMasterData();if(forceRoutes)await replaceCloudRoutes();localDirty=false;setCloudSnapshotSignature(currentUser.id,state);deviceLocalDataAvailable=false;setSyncStatus("Synced");return true}catch(err){console.error(err);setSyncStatus("Sync error");return false}finally{syncing=false}}
+async function syncToCloud(forceRoutes=false){if(!currentUser||!cloudReady||syncing||completionInProgress)return false;syncing=true;try{setSyncStatus("Syncing…");await syncMasterData();if(forceRoutes)await replaceCloudRoutes();localDirty=false;setCloudSnapshotSignature(currentUser.id,state);deviceLocalDataAvailable=false;setSyncStatus("Synced");return true}catch(err){console.error(err);setSyncStatus("Sync error");return false}finally{syncing=false}}
 async function syncNow(){
   if(!currentUser||!cloudReady||syncing)return;
   syncing=true;
