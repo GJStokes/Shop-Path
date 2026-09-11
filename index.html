@@ -641,12 +641,175 @@ function renderShop(app){
   document.getElementById("search").oninput=e=>filterCards(e.target.value);
 }
 function itemCard(x){return `<div class="card item-card" data-name="${esc((x.name+" "+(x.shopStore||x.store||"Pak N Save")).toLowerCase())}"><div class="row"><button class="buy ${x.bought?"done":""}" onclick="buy(decodeURIComponent('${encodeURIComponent(x.id)}'))">${x.bought?"✓":"○"}</button><button class="itemname item-open" type="button" onclick="openShopItem(decodeURIComponent('${encodeURIComponent(x.id)}'))">${esc(x.name)}<div class="storetag">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"Pak N Save")}</div></button><button class="secondary" type="button" onclick="removeFromWeek(decodeURIComponent('${encodeURIComponent(x.id)}'))">Remove</button></div></div>`}
-function renderMaster(app){
-  const items=[...state.items].sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}));
+async function renderMaster(app){
+  // Start with alphabetical order so the list renders immediately.
+  const items=[...state.items].sort(
+    (a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"})
+  );
+
   const uid=currentUser?.id||"";
-  const migrationNotice = (!hasMigrationCompleted(uid) && deviceLocalDataAvailable) ? `<div class="notice"><b>New account setup.</b> This device has local Shop Path data ready to be copied to an empty cloud account.</div>` : "";
-  app.innerHTML=`${migrationNotice}<div class="bar"><input id="search" placeholder="Search master list…"><button class="primary" onclick="openAdd()">Add Item</button></div><div class="bar"><button class="secondary" onclick="openStoreManager()">＋ Add Store</button></div><p class="muted">Tap an item to include it in this week's shop. Tap an item to set amount and store.</p><div id="masterSections"><div class="section master-all-items"><h2>All Items</h2>${items.length?items.map(x=>`<div class="card item-card" data-name="${esc(x.name.toLowerCase())}"><div class="row"><button class="buy ${x.selected?"done":""}" onclick="toggleSelect(decodeURIComponent('${encodeURIComponent(x.id)}'))">${x.selected?"✓":"+"}</button><button class="itemname item-open" type="button" onclick="editItem(decodeURIComponent('${encodeURIComponent(x.id)}'))">${esc(x.name)}<div class="cat">${esc(x.usualQty||"1")} ${esc(x.usualUnit||"each")} · Default: ${esc(x.store||"Pak N Save")}</div><div class="storetag">Tap item to edit default settings</div></button><button class="secondary" onclick="editItem(decodeURIComponent('${encodeURIComponent(x.id)}'))">Edit</button><button class="secondary" onclick="deleteItem(decodeURIComponent('${encodeURIComponent(x.id)}'))">Delete</button></div></div>`).join(""):`<div class="muted">No items yet.</div>`}</div></div>`;
+  const migrationNotice=
+    (!hasMigrationCompleted(uid)&&deviceLocalDataAvailable)
+      ? `<div class="notice"><b>New account setup.</b> This device has local Shop Path data ready to be copied to an empty cloud account.</div>`
+      : "";
+
+  app.innerHTML=`
+    ${migrationNotice}
+
+    <div class="bar">
+      <input id="search" placeholder="Search master list…">
+      <button class="primary" onclick="openAdd()">Add Item</button>
+    </div>
+
+    <div class="bar">
+      <button class="secondary" onclick="openStoreManager()">＋ Add Store</button>
+    </div>
+
+    <p class="muted">
+      Tap an item to include it in this week's shop. Tap an item to set amount and store.
+    </p>
+
+    <div id="masterSections">
+      <div class="section master-all-items">
+        <h2>All Items</h2>
+        ${
+          items.length
+            ? items.map(x=>`
+                <div class="card item-card" data-name="${esc(x.name.toLowerCase())}">
+                  <div class="row">
+                    <button
+                      class="buy ${x.selected?"done":""}"
+                      onclick="toggleSelect(decodeURIComponent('${encodeURIComponent(x.id)}'))"
+                    >
+                      ${x.selected?"✓":"+"}
+                    </button>
+
+                    <button
+                      class="itemname item-open"
+                      type="button"
+                      onclick="editItem(decodeURIComponent('${encodeURIComponent(x.id)}'))"
+                    >
+                      ${esc(x.name)}
+                      <div class="cat">
+                        ${esc(x.usualQty||"1")} ${esc(x.usualUnit||"each")}
+                        · Default: ${esc(x.store||"Pak N Save")}
+                      </div>
+                      <div class="storetag">
+                        Tap item to edit default settings
+                      </div>
+                    </button>
+
+                    <button
+                      class="secondary"
+                      onclick="editItem(decodeURIComponent('${encodeURIComponent(x.id)}'))"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      class="secondary"
+                      onclick="deleteItem(decodeURIComponent('${encodeURIComponent(x.id)}'))"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              `).join("")
+            : `<div class="muted">No items yet.</div>`
+        }
+      </div>
+    </div>
+  `;
+
   document.getElementById("search").oninput=e=>filterCards(e.target.value);
+
+  // Sort the existing item cards by how often each item was bought.
+  // Uses the same household-oriented last-10 completed trips as New Trip.
+  if(!currentUser)return;
+
+  try{
+    const tripsRes=await db.from("shopping_trips")
+      .select("id,completed_at,created_at")
+      .eq("user_id",currentUser.id)
+      .eq("status","completed")
+      .order("completed_at",{ascending:false})
+      .limit(50);
+
+    if(tripsRes.error)throw tripsRes.error;
+
+    const allTrips=tripsRes.data||[];
+    if(!allTrips.length)return;
+
+    const itemRowsRes=await db.from("shopping_trip_items")
+      .select("trip_id,item_name,bought,route_position")
+      .eq("user_id",currentUser.id)
+      .in("trip_id",allTrips.map(t=>t.id))
+      .eq("bought",true)
+      .not("route_position","is",null);
+
+    if(itemRowsRes.error)throw itemRowsRes.error;
+
+    const itemRows=itemRowsRes.data||[];
+
+    // Ignore empty/invalid completed trips, matching New Trip behaviour.
+    const tripsWithBoughtItems=new Set(
+      itemRows.map(row=>row.trip_id).filter(Boolean)
+    );
+
+    const validTrips=allTrips
+      .filter(t=>tripsWithBoughtItems.has(t.id))
+      .slice(0,10);
+
+    if(!validTrips.length)return;
+
+    const recentIds=new Set(validTrips.map(t=>t.id));
+
+    // Count each item once per completed trip.
+    const frequency=new Map();
+
+    for(const row of itemRows){
+      if(!recentIds.has(row.trip_id)||!row.item_name)continue;
+
+      const key=String(row.item_name).trim().toLowerCase();
+      if(!key)continue;
+
+      if(!frequency.has(key))frequency.set(key,new Set());
+      frequency.get(key).add(row.trip_id);
+    }
+
+    const container=document.querySelector(
+      "#masterSections .master-all-items"
+    );
+
+    if(!container)return;
+
+    const cards=[...container.querySelectorAll(".item-card")];
+
+    cards.sort((a,b)=>{
+      const nameA=(a.dataset.name||"").toLowerCase();
+      const nameB=(b.dataset.name||"").toLowerCase();
+
+      const freqA=frequency.get(nameA)?.size||0;
+      const freqB=frequency.get(nameB)?.size||0;
+
+      // Most frequently bought first.
+      if(freqA!==freqB)return freqB-freqA;
+
+      // Alphabetical when frequency is tied.
+      return nameA.localeCompare(
+        nameB,
+        undefined,
+        {sensitivity:"base"}
+      );
+    });
+
+    // Keep the familiar item cards exactly as they are.
+    cards.forEach(card=>container.appendChild(card));
+
+  }catch(err){
+    console.error("Master List frequency sort failed:",err);
+    // Keep the normal alphabetical list if frequency data cannot be loaded.
+  }
 }
 async function clearRoute(){
   if(!confirm("Clear all learned route history for every store? Your Master List and current weekly shop will not be changed."))return;
