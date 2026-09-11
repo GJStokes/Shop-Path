@@ -929,11 +929,17 @@ function adjustShopQty(delta){
 }
 function saveShopItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;x.shopQty=document.getElementById("siQty").value||"1";x.shopUnit=document.getElementById("siUnit").value;let v=document.getElementById("siStore").value;if(v==="__ADD_STORE__")v=x.shopStore||x.store||"Pak N Save";x.shopStore=ensureStore(v);x.selected=true;x.bought=false;saveLocal();closeModal();render();queueCloudSync()}
 function openAdd(){
+  const searchText=(document.getElementById("search")?.value||"").trim();
+  const existingMatch=searchText &&
+    state.items.some(x=>x.name.trim().toLowerCase()===searchText.toLowerCase());
+
+  const prefillName=searchText && !existingMatch ? searchText : "";
+
   document.getElementById("sheet").innerHTML=`
     <h2>Add item</h2>
 
     <label class="muted">Item name</label>
-    <input id="aiName" placeholder="e.g. Apples">
+    <input id="aiName" placeholder="e.g. Apples" value="${esc(prefillName)}">
 
     <label class="muted">Default store</label>
     <select id="aiStore">
