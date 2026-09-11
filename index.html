@@ -670,8 +670,62 @@ function selectAll(v){state.items.forEach(x=>{if(!v)x.selected=false;x.bought=fa
 function removeFromWeek(id){
   const x=state.items.find(item=>item.id===id);
   if(!x)return;
+
+  // Remove this item from the current week's shop.
   x.selected=false;
   x.bought=false;
+
+  // If there are no unbought items left, but there are bought items,
+  // the trip is now complete. Complete it immediately.
+  const remainingUnbought=state.items.some(
+    item=>item.selected&&!item.bought
+  );
+
+  const boughtSelected=state.items.some(
+    item=>item.selected&&item.bought
+  );
+
+  if(!remainingUnbought && boughtSelected){
+    const completed={};
+
+    for(const [store,route] of Object.entries(state.routesByStore||{})){
+      const clean=[...new Set((route||[]).filter(Boolean))];
+      if(clean.length){
+        completed[store]=clean;
+      }
+    }
+
+    // Clear bought items from This Week and Master List.
+    state.items.forEach(item=>{
+      if(item.selected&&item.bought){
+        item.selected=false;
+        item.bought=false;
+      }
+    });
+
+    // Prevent the normal background sync from racing the completion.
+    completionInProgress=true;
+    clearTimeout(cloudSyncTimer);
+    cloudSyncTimer=null;
+
+    // Clear the active trip locally.
+    state.routesByStore={};
+    state.route=[];
+    state.shopStarted=null;
+
+    saveLocal();
+    render();
+
+    // Commit the completed trip to the cloud.
+    syncCompletedTrip(completed).catch(err=>{
+      console.error("Complete trip after remove error:",err);
+      setSyncStatus("Sync error");
+    });
+
+    return;
+  }
+
+  // Normal removal when the trip is not yet complete.
   saveLocal();
   render();
   queueCloudSync();
