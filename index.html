@@ -1199,7 +1199,7 @@ function editItem(id){const x=state.items.find(x=>x.id===id);if(!x)return;const 
 <label class="muted" for="eiStore">Default store</label><select id="eiStore">${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`<option value="${esc(st)}" ${st===defaultStore?"selected":""}>${esc(st)}</option>`).join("")}</select><button class="secondary" type="button" onclick="addStoreFromField('eiStore')">＋ Add new store</button><div class="field-group"><label class="muted field-label" for="eiQty">Usual quantity</label><input id="eiQty" class="field-input" type="number" min="0" step="any" value="${esc(x.usualQty)}"></div><div class="field-group"><label class="muted field-label" for="eiUnit">Unit</label><select id="eiUnit" class="field-input">${UNITS.map(u=>`<option value="${esc(u)}" ${u===x.usualUnit?"selected":""}>${esc(u)}</option>`).join("")}</select><label class="muted" for="eiNewTripMode">New trip behaviour</label><select id="eiNewTripMode"><option value="auto" ${mode==="auto"?"selected":""}>Automatic — use buying frequency</option><option value="always" ${mode==="always"?"selected":""}>Always include</option><option value="never" ${mode==="never"?"selected":""}>Never include</option></select><div class="actions"><button class="secondary" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveEdit(decodeURIComponent('${encodeURIComponent(id)}'))">Save</button></div>`;openModal()}
 function saveEdit(id){
   const x=state.items.find(x=>x.id===id); if(!x)return;
-  const oldName=x.name, newName=document.getElementById("eiName").value.trim();
+  const oldName=x.name, newName=document.getElementById("eiName").value.trim();const newBrandName=document.getElementById("eiBrand").value.trim();
   if(!newName){alert("Please enter an item name.");return}
   if(state.items.some(it=>it.id!==id&&it.name.toLowerCase()===newName.toLowerCase())){alert("That item name already exists.");return}
   if(newName!==oldName){
@@ -1218,7 +1218,7 @@ function saveEdit(id){
     }
   }
   const previousShopStore=x.shopStore;
-  x.name=newName; x.id=newName; x.category="";
+  x.name=newName; x.brandName=newBrandName; x.id=newName; x.category="";
   const editedStore=ensureStore(document.getElementById("eiStore").value);
   x.store=editedStore;
   // Master List Edit changes the default store only. A current week's store is
