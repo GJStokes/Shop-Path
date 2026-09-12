@@ -1192,7 +1192,7 @@ function addItem(){
   closeModal();
   render();
   queueCloudSync();
-}t:false,category:"",newTripMode:document.getElementById("aiNewTripMode")?.value||"auto",updatedAt:new Date().toISOString()});saveLocal();closeModal();render();queueCloudSync()}
+
 async function deleteItem(id){
   const x=state.items.find(item=>item.id===id);
   if(!x)return;
