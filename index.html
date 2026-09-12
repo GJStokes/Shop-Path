@@ -166,7 +166,8 @@ function normalizeState(){
     if(x.selected==null)x.selected=false;
     if(x.bought==null)x.bought=false;
     if(x.updatedAt===undefined)x.updatedAt=null;
-    if(x.usualQty==null)x.usualQty="1";
+if(x.brandName===undefined)x.brandName="";
+if(x.usualQty==null)x.usualQty="1";
     if(!x.usualUnit)x.usualUnit="each";
     if(x.shopQty==null)x.shopQty=x.usualQty;
     if(!x.shopUnit)x.shopUnit=x.usualUnit;
