@@ -1151,7 +1151,7 @@ function openAdd(){
 
   openModal();
 }
-function addItem(){const name=document.getElementById("aiName").value.trim();if(!name){alert("Please enter an item name.");return}if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){alert("That item already exists.");return}let store=document.getElementById("aiStore").value;if(store==="__ADD_STORE__")store="Pak N Save";store=ensureStore(store);const q=document.getElementById("aiQty").value||"1",u=document.getElementById("aiUnit").value;state.items.push({id:name,name,store,shopStore:store,usualQty:q,usualUnit:u,shopQty:q,shopUnit:u,selected:true,bought:false,category:"",newTripMode:document.getElementById("aiNewTripMode")?.value||"auto",updatedAt:new Date().toISOString()});saveLocal();closeModal();render();queueCloudSync()}
+function addItem(){const name=document.getElementById("aiName").value.trim();if(!name){alert("Please enter an item name.");return}if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){alert("That item already exists.");return}let store=document.getElementById("aiStore").value;if(store==="__ADD_STORE__")store="Pak N Save";store=ensureStore(store);const brandName=document.getElementById("aiBrand").value.trim(),q=document.getElementById("aiQty").value||"1",u=document.getElementById("aiUnit").value;state.items.push({id:name,name,brandName,store,shopStore:store,usualQty:q,usualUnit:u,shopQty:q,shopUnit:u,selected:true,bought:false,category:"",newTripMode:document.getElementById("aiNewTripMode")?.value||"auto",updatedAt:new Date().toISOString()});saveLocal();closeModal();render();queueCloudSync()}
 async function deleteItem(id){
   const x=state.items.find(item=>item.id===id);
   if(!x)return;
