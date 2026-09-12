@@ -1104,10 +1104,13 @@ function openAdd(){
   document.getElementById("sheet").innerHTML=`
     <h2>Add item</h2>
 
-    <label class="muted">Item name</label>
-    <input id="aiName" placeholder="e.g. Apples" value="${esc(prefillName)}">
+   <label class="muted">Item name</label>
+<input id="aiName" placeholder="e.g. Apples" value="${esc(prefillName)}">
 
-    <label class="muted">Default store</label>
+<label class="muted">Brand Name</label>
+<input id="aiBrand" placeholder="e.g. Wattie's">
+
+<label class="muted">Default store</label>
     <select id="aiStore">
       ${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`
         <option value="${esc(st)}">${esc(st)}</option>
