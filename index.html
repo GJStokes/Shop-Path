@@ -1,5 +1,7 @@
 <!doctype html>
+
 <!-- Shop Path master item persistence fix: item-level updated_at sync -->
+
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -55,6 +57,7 @@ button{font:inherit}.primary{background:#111827;color:white;border:0;border-radi
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
 const SUPABASE_URL="https://dyfdsvefpxaoIuctmxuo.supabase.co".toLowerCase();
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_8Tb2Ndc6d2TpEqj7oIFJvg_7CgYv9Bm";
@@ -166,8 +169,7 @@ function normalizeState(){
     if(x.selected==null)x.selected=false;
     if(x.bought==null)x.bought=false;
     if(x.updatedAt===undefined)x.updatedAt=null;
-if(x.brandName===undefined)x.brandName="";
-if(x.usualQty==null)x.usualQty="1";
+    if(x.usualQty==null)x.usualQty="1";
     if(!x.usualUnit)x.usualUnit="each";
     if(x.shopQty==null)x.shopQty=x.usualQty;
     if(!x.shopUnit)x.shopUnit=x.usualUnit;
@@ -1102,13 +1104,10 @@ function openAdd(){
   document.getElementById("sheet").innerHTML=`
     <h2>Add item</h2>
 
-   <label class="muted">Item name</label>
-<input id="aiName" placeholder="e.g. Apples" value="${esc(prefillName)}">
+    <label class="muted">Item name</label>
+    <input id="aiName" placeholder="e.g. Apples" value="${esc(prefillName)}">
 
-<label class="muted">Brand name</label>
-<input id="aiBrand" placeholder="e.g. Sanitarium" autocomplete="off">
-
-<label class="muted">Default store</label>
+    <label class="muted">Default store</label>
     <select id="aiStore">
       ${state.stores.slice().sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"})).map(st=>`
         <option value="${esc(st)}">${esc(st)}</option>
@@ -1149,50 +1148,7 @@ function openAdd(){
 
   openModal();
 }
-function addItem(){
-  const name=document.getElementById("aiName").value.trim();
-
-  if(!name){
-    alert("Please enter an item name.");
-    return;
-  }
-
-  if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){
-    alert("That item already exists.");
-    return;
-  }
-
-  const brandName=document.getElementById("aiBrand")?.value.trim()||"";
-
-  let store=document.getElementById("aiStore").value;
-  if(store==="__ADD_STORE__")store="Pak N Save";
-  store=ensureStore(store);
-
-  const q=document.getElementById("aiQty").value||"1";
-  const u=document.getElementById("aiUnit").value;
-
-  state.items.push({
-    id:name,
-    name,
-    brandName,
-    store,
-    shopStore:store,
-    usualQty:q,
-    usualUnit:u,
-    shopQty:q,
-    shopUnit:u,
-    selected:true,
-    bought:false,
-    category:"",
-    newTripMode:document.getElementById("aiNewTripMode")?.value||"auto",
-    updatedAt:new Date().toISOString()
-  });
-
-  saveLocal();
-  closeModal();
-  render();
-  queueCloudSync();
-
+function addItem(){const name=document.getElementById("aiName").value.trim();if(!name){alert("Please enter an item name.");return}if(state.items.some(x=>x.name.toLowerCase()===name.toLowerCase())){alert("That item already exists.");return}let store=document.getElementById("aiStore").value;if(store==="__ADD_STORE__")store="Pak N Save";store=ensureStore(store);const q=document.getElementById("aiQty").value||"1",u=document.getElementById("aiUnit").value;state.items.push({id:name,name,store,shopStore:store,usualQty:q,usualUnit:u,shopQty:q,shopUnit:u,selected:true,bought:false,category:"",newTripMode:document.getElementById("aiNewTripMode")?.value||"auto",updatedAt:new Date().toISOString()});saveLocal();closeModal();render();queueCloudSync()}
 async function deleteItem(id){
   const x=state.items.find(item=>item.id===id);
   if(!x)return;
@@ -1791,5 +1747,6 @@ function setTabs(){document.querySelectorAll(".tab").forEach(b=>b.classList.remo
 db.auth.onAuthStateChange(async (_event,session)=>{if(session&&!currentUser){try{await bootAuthenticated(session.user)}catch(e){console.error(e)}}else if(!session&&currentUser){currentUser=null;cloudReady=false;authVisible(true)}});
 (async()=>{const {data}=await db.auth.getSession();if(data.session)await bootAuthenticated(data.session.user);else{loadLocal();authVisible(true)}})();
 </script>
+
 </body>
 </html>
