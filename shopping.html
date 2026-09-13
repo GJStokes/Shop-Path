@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#112827">
+<title>Shop Path Shopping List</title>
+
+<style>
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    margin:0;
+    padding:20px;
+    background:#f3f4f6;
+    color:#111827;
+  }
+
+  .wrap{
+    max-width:700px;
+    margin:0 auto;
+  }
+
+  h1{
+    font-size:26px;
+    margin:0 0 4px;
+  }
+
+  .date{
+    color:#6b7280;
+    margin-bottom:24px;
+  }
+
+  h2{
+    font-size:19px;
+    margin:28px 0 0;
+    padding-bottom:7px;
+    border-bottom:2px solid #111827;
+  }
+
+  .item{
+    background:white;
+    padding:15px 12px;
+    border-bottom:1px solid #e5e7eb;
+    font-size:18px;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  .item.bought{
+    text-decoration:line-through;
+    opacity:.45;
+  }
+
+  .brand{
+    font-size:15px;
+    color:#374151;
+    margin-top:3px;
+  }
+
+  .details{
+    font-size:14px;
+    color:#6b7280;
+    margin-top:3px;
+  }
+
+  .hint{
+    font-size:14px;
+    color:#6b7280;
+    margin:0 0 20px;
+  }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <h1>🛒 Shop Path</h1>
+  <div class="date">Shopping List · <span id="date"></span></div>
+  <div class="hint">Tap an item when you have bought it.</div>
+
+  <div id="list"></div>
+
+</div>
+
+<script>
+const data=JSON.parse(new URLSearchParams(window.location.search).get("list")||"[]");
+
+document.getElementById("date").textContent=
+  new Date().toLocaleDateString(undefined,{
+    day:"numeric",
+    month:"long",
+    year:"numeric"
+  });
+
+const stores=[...new Set(data.map(x=>x.store||"Pak N Save"))]
+  .sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
+
+document.getElementById("list").innerHTML=stores.map(store=>{
+  const items=data.filter(x=>(x.store||"Pak N Save")===store);
+
+  return `
+    <section>
+      <h2>${esc(store)}</h2>
+      ${items.map((x,i)=>`
+        <div class="item" onclick="toggleItem(this)">
+          <div><b>${esc(x.name)}</b></div>
+          ${x.brand?`<div class="brand">${esc(x.brand)}</div>`:""}
+          <div class="details">${esc(x.qty||"1")} ${esc(x.unit||"each")}</div>
+        </div>
+      `).join("")}
+    </section>
+  `;
+}).join("");
+
+function toggleItem(el){
+  el.classList.toggle("bought");
+}
+
+function esc(value){
+  return String(value??"")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+}
+</script>
+
+</body>
+</html>
