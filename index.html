@@ -642,6 +642,7 @@ function renderShop(app){
  <div class="bar"><button class="secondary" onclick="selectAll(false)">Clear shop</button><button class="secondary" onclick="resetBought()">New trip</button><button class="secondary" onclick="shareShoppingList()">📱 Share Shopping List</button></div>
   ${sel.length?stores.map(store=>{const items=sortedSelectedByStore(store).filter(x=>!x.bought);return items.length?`<div class="section"><h2>${esc(store)}</h2>${items.map(itemCard).join("")}</div>`:""}).join(""):`<div class="empty">${allSel.length?"All items bought! 🎉<br><br>Tap <b>New trip</b> to restore this week's list, or go to <b>Master List</b> to add more items.":"Your weekly shop is empty.<br><br>Go to <b>Master List</b> and tap items to add them."}</div>`}`;
   document.getElementById("search").oninput=e=>filterCards(e.target.value);
+}
 function shareShoppingList(){
   const items=state.items.filter(x=>x.selected&&!x.bought);
 
