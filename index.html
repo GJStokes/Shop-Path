@@ -650,8 +650,13 @@ function shareShoppingList(){
     alert("There are no unbought items in This Week.");
     return;
   }
+const stores=[...new Set(items.map(x=>x.shopStore||x.store||"Pak N Save"))];
 
-  const list=items.map(x=>({
+const orderedItems=stores.flatMap(store=>
+  sortedSelectedByStore(store).filter(x=>x.selected&&!x.bought)
+);
+
+const list=orderedItems.map(x=>({
     name:x.name,
     brand:x.brandName||"",
     qty:x.shopQty||x.usualQty||"1",
