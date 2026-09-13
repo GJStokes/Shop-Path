@@ -1401,7 +1401,7 @@ async function downloadIntoLocal(remote){
   state.categories=[];
   state.stores=remote.stores.length?remote.stores.sort((a,b)=>a.sort_order-b.sort_order).map(x=>x.name):[];
     const fallbackStore=state.stores[0]||"";
-  state.items=(remote.items||[]).sort((a,b)=>a.sort_order-b.sort_order).map(x=>({id:x.name,name:x.name,category:"",store:storeById[x.default_store_id]||fallbackStore,shopStore:storeById[x.default_store_id]||fallbackStore,usualQty:String(x.usual_quantity??1),usualUnit:x.usual_unit||"each",shopQty:String(x.usual_quantity??1),shopUnit:x.usual_unit||"each",selected:false,bought:false,newTripMode:x.new_trip_mode||"auto",updatedAt:x.updated_at||null}));
+  state.items=(remote.items||[]).sort((a,b)=>a.sort_order-b.sort_order).map(x=>({id:x.name,name:x.name,brandName:x.brand_name||"",category:"",store:storeById[x.default_store_id]||fallbackStore,shopStore:storeById[x.default_store_id]||fallbackStore,usualQty:String(x.usual_quantity??1),usualUnit:x.usual_unit||"each",shopQty:String(x.usual_quantity??1),shopUnit:x.usual_unit||"each",selected:false,bought:false,newTripMode:x.new_trip_mode||"auto",updatedAt:x.updated_at||null}));
   // Restore the most recent genuinely active open shopping trip, if there is one.
   // A stale open trip can remain briefly around completion because another sync may
   // have written it before the final Bought tap. Never resurrect a trip whose
@@ -1653,7 +1653,7 @@ async function syncMasterData(){
   // Master List item sync is item-aware. A device may be behind another device,
   // so never let an older local copy overwrite a newer cloud item.
   const remoteRes=await db.from("master_items")
-    .select("id,name,default_store_id,usual_quantity,usual_unit,new_trip_mode,sort_order,updated_at")
+    .select("id,name,brand_name,default_store_id,usual_quantity,usual_unit,new_trip_mode,sort_order,updated_at")
     .eq("user_id",uid);
   if(remoteRes.error)throw remoteRes.error;
   const remoteByName=new Map((remoteRes.data||[]).map(row=>[String(row.name||"").trim().toLowerCase(),row]));
@@ -1661,6 +1661,7 @@ async function syncMasterData(){
   const candidateRows=state.items.map((x,i)=>({
     user_id:uid,
     name:x.name,
+    brand_name:x.brandName||"",
     category_id:null,
     default_store_id:storeMap[String(x.store||"").trim().toLowerCase()]||null,
     usual_quantity:Number(x.usualQty)||1,
