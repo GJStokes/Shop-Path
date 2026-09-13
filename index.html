@@ -639,7 +639,7 @@ function renderShop(app){
   const stores=[...new Set(sel.map(x=>x.shopStore||x.store||"Pak N Save"))].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:"base"}));
   app.innerHTML=`<div class="stats"><div class="stat"><b>${allSel.length}</b>Items</div><div class="stat"><b>${bought}</b>Bought</div><div class="stat"><b>${sel.length}</b>Left</div></div>
   <div class="bar"><input id="search" placeholder="Search this week's shop…"><button class="primary" onclick="openAdd()">Add</button></div>
-  <div class="bar"><button class="secondary" onclick="selectAll(false)">Clear shop</button><button class="secondary" onclick="resetBought()">New trip</button></div>
+ <div class="bar"><button class="secondary" onclick="selectAll(false)">Clear shop</button><button class="secondary" onclick="resetBought()">New trip</button><button class="secondary" onclick="shareShoppingList()">📄 Share Shopping List</button></div>
   ${sel.length?stores.map(store=>{const items=sortedSelectedByStore(store).filter(x=>!x.bought);return items.length?`<div class="section"><h2>${esc(store)}</h2>${items.map(itemCard).join("")}</div>`:""}).join(""):`<div class="empty">${allSel.length?"All items bought! 🎉<br><br>Tap <b>New trip</b> to restore this week's list, or go to <b>Master List</b> to add more items.":"Your weekly shop is empty.<br><br>Go to <b>Master List</b> and tap items to add them."}</div>`}`;
   document.getElementById("search").oninput=e=>filterCards(e.target.value);
 }
