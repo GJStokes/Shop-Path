@@ -1451,7 +1451,7 @@ async function fetchRemoteState(){
   const run=()=>Promise.all([
     db.from("categories").select("id,name,sort_order").eq("user_id",uid).order("sort_order",{ascending:true}),
     db.from("stores").select("id,name,sort_order").eq("user_id",uid).order("sort_order",{ascending:true}),
-    db.from("master_items").select("id,name,category_id,default_store_id,usual_quantity,usual_unit,new_trip_mode,sort_order").eq("user_id",uid).order("sort_order",{ascending:true}),
+    db.from("master_items").select("id,name,brand_name,category_id,default_store_id,usual_quantity,usual_unit,new_trip_mode,sort_order")
     db.from("shopping_trips").select("id,status,started_at,completed_at,created_at,updated_at").eq("user_id",uid).order("created_at",{ascending:false}),
     db.from("route_pairs").select("id,store_name,item_a_name,item_b_name,observations,last_observed_at").eq("user_id",uid),
     db.from("latest_store_routes").select("id,store_name,trip_id,route_items,completed_at").eq("user_id",uid)
