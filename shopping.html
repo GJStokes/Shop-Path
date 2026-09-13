@@ -76,7 +76,8 @@
 
   <h1>🛒 Shop Path</h1>
   <div class="date">Shopping List · <span id="date"></span></div>
-  <div class="hint">Tap an item when you have bought it.</div>
+ <div class="hint">Tap an item when you have bought it.</div>
+<button class="share" onclick="shareList()">🔗 Share List</button>
 
   <div id="list"></div>
 
@@ -114,6 +115,18 @@ document.getElementById("list").innerHTML=stores.map(store=>{
 
 function toggleItem(el){
   el.classList.toggle("bought");
+}
+  function shareList(){
+  if(navigator.share){
+    navigator.share({
+      title:"Shop Path Shopping List",
+      text:"Shop Path Shopping List",
+      url:window.location.href
+    });
+  }else{
+    navigator.clipboard.writeText(window.location.href);
+    alert("Shopping list link copied.");
+  }
 }
 
 function esc(value){
