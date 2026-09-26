@@ -1733,7 +1733,41 @@ async function syncMasterData(){
   await syncOpenTrip();
 }
 
-async function syncToCloud(forceRoutes=false){if(!currentUser||!cloudReady||syncing||completionInProgress)return false;syncing=true;try{setSyncStatus("Syncing…");await syncMasterData();if(forceRoutes)await replaceCloudRoutes();localDirty=false;setCloudSnapshotSignature(currentUser.id,state);deviceLocalDataAvailable=false;setSyncStatus("Synced");return true}catch(err){console.error(err);setSyncStatus("Sync error");return false}finally{syncing=false}}
+async function syncToCloud(forceRoutes=false){
+  if(!currentUser||!cloudReady||syncing||completionInProgress)return false;
+  syncing=true;
+
+  try{
+    setSyncStatus("Syncing…");
+
+    try{
+      await syncMasterData();
+      if(forceRoutes)await replaceCloudRoutes();
+    }catch(firstError){
+      console.warn("First sync attempt failed. Retrying…",firstError);
+
+      // Give a brief network interruption a chance to recover.
+      await new Promise(resolve=>setTimeout(resolve,1000));
+
+      await syncMasterData();
+      if(forceRoutes)await replaceCloudRoutes();
+    }
+
+    localDirty=false;
+    setCloudSnapshotSignature(currentUser.id,state);
+    deviceLocalDataAvailable=false;
+    setSyncStatus("Synced");
+    return true;
+
+  }catch(err){
+    console.error("Sync error after retry:",err);
+    setSyncStatus("Sync error");
+    return false;
+
+  }finally{
+    syncing=false;
+  }
+}
 async function syncNow(){
   if(!currentUser||!cloudReady||syncing)return;
   syncing=true;
