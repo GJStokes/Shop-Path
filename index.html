@@ -76,6 +76,7 @@ let syncing=false;
 let completionInProgress=false;
 let localDirty=false;
 let deviceLocalDataAvailable=false;
+let masterFrequency=new Map();
 let view="shop";
 
 function freshState(){
@@ -673,9 +674,18 @@ function itemCard(x){
 }
 async function renderMaster(app){
   // Start with alphabetical order so the list renders immediately.
-  const items=[...state.items].sort(
-    (a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"})
+  const items=[...state.items].sort((a,b)=>{
+  const freqA=masterFrequency.get(String(a.name).trim().toLowerCase())||0;
+  const freqB=masterFrequency.get(String(b.name).trim().toLowerCase())||0;
+
+  if(freqA!==freqB)return freqB-freqA;
+
+  return a.name.localeCompare(
+    b.name,
+    undefined,
+    {sensitivity:"base"}
   );
+});
 
   const uid=currentUser?.id||"";
   const migrationNotice=
@@ -790,11 +800,14 @@ async function renderMaster(app){
       .filter(t=>tripsWithBoughtItems.has(t.id))
       .slice(0,10);
 
-    if(!validTrips.length)return;
+    if(!validTrips.length){
+  masterFrequency=new Map();
+  return;
+}
 
     const recentIds=new Set(validTrips.map(t=>t.id));
 
-    // Count each item once per completed trip.
+        // Count each item once per completed trip.
     const frequency=new Map();
 
     for(const row of itemRows){
@@ -806,6 +819,12 @@ async function renderMaster(app){
       if(!frequency.has(key))frequency.set(key,new Set());
       frequency.get(key).add(row.trip_id);
     }
+
+    // Cache the frequency counts so the Master List can keep its
+    // remembered order while background syncing is taking place.
+    masterFrequency=new Map(
+      [...frequency.entries()].map(([key,trips])=>[key,trips.size])
+    );
 
     const container=document.querySelector(
       "#masterSections .master-all-items"
