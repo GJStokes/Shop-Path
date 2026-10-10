@@ -77,6 +77,7 @@ let completionInProgress=false;
 let localDirty=false;
 let deviceLocalDataAvailable=false;
 let masterFrequency=new Map();
+  let masterScrollPosition=0;
 let view="shop";
 
 function freshState(){
@@ -1829,7 +1830,32 @@ async function signOut(){await db.auth.signOut();currentUser=null;cloudReady=fal
 
 document.getElementById("signInBtn").onclick=()=>signIn();document.getElementById("signUpBtn").onclick=()=>signUp();document.getElementById("resetBtn").onclick=()=>resetPassword();document.getElementById("signOutBtn").onclick=()=>signOut();document.getElementById("syncNowBtn").onclick=()=>syncNow();
 ["authEmail","authPassword"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{if(e.key==="Enter")signIn()}));
-document.getElementById("tabShop").onclick=()=>{view="shop";setTabs();render()};document.getElementById("tabMaster").onclick=()=>{view="master";setTabs();render()};document.getElementById("tabRoute").onclick=()=>{view="route";setTabs();render()};
+document.getElementById("tabShop").onclick=()=>{
+  if(view==="master")masterScrollPosition=window.scrollY;
+  view="shop";
+  setTabs();
+  render();
+};
+
+document.getElementById("tabMaster").onclick=()=>{
+  const returningFromShop=view==="shop";
+  view="master";
+  setTabs();
+  render();
+
+  if(returningFromShop){
+    requestAnimationFrame(()=>{
+      window.scrollTo(0,masterScrollPosition);
+    });
+  }
+};
+
+document.getElementById("tabRoute").onclick=()=>{
+  if(view==="master")masterScrollPosition=window.scrollY;
+  view="route";
+  setTabs();
+  render();
+};
 function setTabs(){document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));document.getElementById(view==="master"?"tabMaster":view==="route"?"tabRoute":"tabShop").classList.add("active")}
 
 db.auth.onAuthStateChange(async (_event,session)=>{if(session&&!currentUser){try{await bootAuthenticated(session.user)}catch(e){console.error(e)}}else if(!session&&currentUser){currentUser=null;cloudReady=false;authVisible(true)}});
