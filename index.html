@@ -653,6 +653,7 @@ let tripSpendingEntries=[];
 function openTripSpending(itemId=null){
   const app=document.getElementById("app");
   const selectedItem=itemId?state.items.find(x=>x.id===itemId):null;
+ const spendingItems=state.items.filter(x=>x.selected);
 
   app.innerHTML=`
     <div class="section">
@@ -665,12 +666,14 @@ function openTripSpending(itemId=null){
 
       <div class="card">
         <label for="spendingItem">Item</label>
-        <input id="spendingItem" placeholder="e.g. Onions" value="${selectedItem?esc(selectedItem.name):""}">
+       <select id="spendingItem" onchange="updateTripSpendingItem()">
+  ${spendingItems.map(x=><option value="${esc(String(x.id))}" ${(selectedItem?selectedItem.id===x.id:spendingItems[0]?.id===x.id)?"selected":""}>${esc(x.name)} — Qty: ${esc(x.shopQty||x.usualQty||1)} ${esc(x.shopUnit||x.usualUnit||"each")}</option>`).join("")}
+</select>
 
         <label for="spendingStore">Store</label>
-        <select id="spendingStore">
+        <select id="spendingStore" onchange="updateTripSpendingItem()">
   
-${[...new Set([...(state.stores||[]),...(selectedItem?[selectedItem.shopStore||selectedItem.store||"Pak N Save"]:[]),"Pak N Save"])].map(store=>`<option value="${esc(store)}" ${(selectedItem?(selectedItem.shopStore||selectedItem.store||"Pak N Save"):"Pak N Save")===store?"selected":""}>${esc(store)}</option>`).join("")}
+${[...new Set([...(state.stores||[]),...spendingItems.map(x=>x.shopStore||x.store||"Pak N Save"),"Pak N Save"])].map(store=>`<option value="${esc(store)}" ${(selectedItem?(selectedItem.shopStore||selectedItem.store||"Pak N Save"):spendingItems[0]?.shopStore||spendingItems[0]?.store||"Pak N Save")===store?"selected":""}>${esc(store)}</option>`).join("")}
 
 </select>
 
@@ -679,7 +682,7 @@ ${[...new Set([...(state.stores||[]),...(selectedItem?[selectedItem.shopStore||s
 <input id="spendingPrice" type="number" min="0" step="0.01" placeholder="Confirmed shelf price">
 
 <label for="spendingQuantity">Quantity</label>
-<input id="spendingQuantity" type="number" min="1" step="1" value="1">
+<input id="spendingQuantity" type="number" min="1" step="1" value="${selectedItem?(selectedItem.shopQty||selectedItem.usualQty||1):(spendingItems[0]?.shopQty||spendingItems[0]?.usualQty||1)}">
 
 <label for="spendingWeight">Weight in kg (for weighed items)</label>
 <input id="spendingWeight" type="number" min="0" step="0.001" placeholder="Leave blank if not weighed">
@@ -693,6 +696,18 @@ ${[...new Set([...(state.stores||[]),...(selectedItem?[selectedItem.shopStore||s
   `;
 
   renderTripSpendingResults();
+}
+  function updateTripSpendingItem(){
+  const item=state.items.find(
+  x=>String(x.id)===document.getElementById("spendingItem").value
+);
+  if(!item)return;
+
+  document.getElementById("spendingStore").value=
+    item.shopStore||item.store||"Pak N Save";
+
+  document.getElementById("spendingQuantity").value=
+    item.shopQty||item.usualQty||1;
 }
 
 
