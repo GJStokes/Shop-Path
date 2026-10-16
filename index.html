@@ -674,11 +674,16 @@ ${[...new Set([...(state.stores||[]),...(selectedItem?[selectedItem.shopStore||s
 
 </select>
 
-        <label for="spendingPrice">Total price ($)</label>
-        <input id="spendingPrice" type="number" min="0" step="0.01" placeholder="e.g. 3.60">
+        
+<label for="spendingPrice">Price ($)</label>
+<input id="spendingPrice" type="number" min="0" step="0.01" placeholder="Confirmed shelf price">
 
-        <label for="spendingWeight">Weight in kg (optional)</label>
-        <input id="spendingWeight" type="number" min="0" step="0.001" placeholder="e.g. 1.2">
+<label for="spendingQuantity">Quantity</label>
+<input id="spendingQuantity" type="number" min="1" step="1" value="1">
+
+<label for="spendingWeight">Weight in kg (for weighed items)</label>
+<input id="spendingWeight" type="number" min="0" step="0.001" placeholder="Leave blank if not weighed">
+
 
         <button class="primary" onclick="addTripSpendingEntry()">Add to Trip Spending</button>
       </div>
@@ -690,10 +695,14 @@ ${[...new Set([...(state.stores||[]),...(selectedItem?[selectedItem.shopStore||s
   renderTripSpendingResults();
 }
 
+
 function addTripSpendingEntry(){
   const item=document.getElementById("spendingItem").value.trim();
   const store=document.getElementById("spendingStore").value.trim()||"Unspecified store";
-  const price=Number(document.getElementById("spendingPrice").value);
+  const priceInput=document.getElementById("spendingPrice").value;
+  const price=Number(priceInput);
+  const quantityInput=document.getElementById("spendingQuantity").value;
+  const quantity=Number(quantityInput);
   const weightValue=document.getElementById("spendingWeight").value;
   const weight=weightValue===""?null:Number(weightValue);
 
@@ -702,8 +711,13 @@ function addTripSpendingEntry(){
     return;
   }
 
-  if(document.getElementById("spendingPrice").value===""||!Number.isFinite(price)||price<=0){
+  if(priceInput===""||!Number.isFinite(price)||price<=0){
     alert("Please enter a price greater than zero.");
+    return;
+  }
+
+  if(quantityInput===""||!Number.isFinite(quantity)||quantity<1){
+    alert("Please enter a quantity of at least 1.");
     return;
   }
 
@@ -712,15 +726,26 @@ function addTripSpendingEntry(){
     return;
   }
 
-  tripSpendingEntries.push({item,store,price,weight});
+  const totalPrice=weight!==null?price*weight:price*quantity;
+
+  tripSpendingEntries.push({
+    item,
+    store,
+    price:totalPrice,
+    unitPrice:price,
+    quantity,
+    weight
+  });
 
   renderTripSpendingResults();
 
   document.getElementById("spendingItem").value="";
   document.getElementById("spendingPrice").value="";
+  document.getElementById("spendingQuantity").value="1";
   document.getElementById("spendingWeight").value="";
   document.getElementById("spendingItem").focus();
 }
+
 
 function renderTripSpendingResults(){
   const results=document.getElementById("spendingResults");
