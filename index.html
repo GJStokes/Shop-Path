@@ -650,8 +650,9 @@ function renderShop(app){
 
 let tripSpendingEntries=[];
 
-function openTripSpending(){
+function openTripSpending(itemId=null){
   const app=document.getElementById("app");
+  const selectedItem=itemId?state.items.find(x=>x.id===itemId):null;
 
   app.innerHTML=`
     <div class="section">
@@ -664,11 +665,13 @@ function openTripSpending(){
 
       <div class="card">
         <label for="spendingItem">Item</label>
-        <input id="spendingItem" placeholder="e.g. Onions">
+        <input id="spendingItem" placeholder="e.g. Onions" value="${selectedItem?esc(selectedItem.name):""}">
 
         <label for="spendingStore">Store</label>
         <select id="spendingStore">
-  ${DEFAULT_STORES.map(store=>`<option value="${esc(store)}">${esc(store)}</option>`).join("")}
+  
+${[...new Set([...(state.stores||[]),...(selectedItem?[selectedItem.shopStore||selectedItem.store||"Pak N Save"]:[]),"Pak N Save"])].map(store=>`<option value="${esc(store)}" ${(selectedItem?(selectedItem.shopStore||selectedItem.store||"Pak N Save"):"Pak N Save")===store?"selected":""}>${esc(store)}</option>`).join("")}
+
 </select>
 
         <label for="spendingPrice">Total price ($)</label>
@@ -774,7 +777,9 @@ const list=orderedItems.map(x=>({
   window.open(url,"_blank");
 }
 function itemCard(x){
-  return `<div class="card item-card" data-name="${esc((x.name+" "+(x.shopStore||x.store||"Pak N Save")).toLowerCase())}"><div class="row"><button class="buy ${x.bought?"done":""}" onclick="buy(decodeURIComponent('${encodeURIComponent(x.id)}'))">${x.bought?"✓":"○"}</button><button class="itemname item-open" type="button" onclick="openShopItem(decodeURIComponent('${encodeURIComponent(x.id)}'))">${esc(x.name)}${x.brandName?"<div class=\"storetag\">"+esc(x.brandName)+"</div>":""}<div class="storetag">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"Pak N Save")}</div></button><button class="secondary" type="button" onclick="removeFromWeek(decodeURIComponent('${encodeURIComponent(x.id)}'))">Remove</button></div></div>`;
+  
+return `<div class="card item-card" data-name="${esc((x.name+" "+(x.shopStore||x.store||"Pak N Save")).toLowerCase())}"><div class="row"><button class="buy ${x.bought?"done":""}" onclick="buy(decodeURIComponent('${encodeURIComponent(x.id)}'))">${x.bought?"✓":"○"}</button><button class="itemname item-open" type="button" onclick="openShopItem(decodeURIComponent('${encodeURIComponent(x.id)}'))">${esc(x.name)}${x.brandName?"<div class=\"storetag\">"+esc(x.brandName)+"</div>":""}<div class="storetag">${esc(x.shopQty)} ${esc(x.shopUnit)} · ${esc(x.shopStore||x.store||"Pak N Save")}</div></button><button class="secondary" type="button" onclick="openTripSpending(decodeURIComponent('${encodeURIComponent(x.id)}'))">$</button><button class="secondary" type="button" onclick="removeFromWeek(decodeURIComponent('${encodeURIComponent(x.id)}'))">Remove</button></div></div>`;
+
 }
 async function renderMaster(app){
   // Start with alphabetical order so the list renders immediately.
