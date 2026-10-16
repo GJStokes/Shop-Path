@@ -647,7 +647,106 @@ function renderShop(app){
   ${sel.length?stores.map(store=>{const items=sortedSelectedByStore(store).filter(x=>!x.bought);return items.length?`<div class="section"><h2>${esc(store)}</h2>${items.map(itemCard).join("")}</div>`:""}).join(""):`<div class="empty">${allSel.length?"All items bought! 🎉<br><br>Tap <b>New trip</b> to restore this week's list, or go to <b>Master List</b> to add more items.":"Your weekly shop is empty.<br><br>Go to <b>Master List</b> and tap items to add them."}</div>`}`;
   document.getElementById("search").oninput=e=>filterCards(e.target.value);
 }
-function shareShoppingList(){
+
+let tripSpendingEntries=[];
+
+function openTripSpending(){
+  const app=document.getElementById("app");
+
+  app.innerHTML=`
+    <div class="section">
+      <h2>Trip Spending</h2>
+      <p>Record prices for this shopping trip. Prices are temporary and won't be saved to your Master List.</p>
+
+      <div class="bar">
+        <button class="secondary" onclick="renderShop(document.getElementById('app'))">Back to This Week</button>
+      </div>
+
+      <div class="card">
+        <label for="spendingItem">Item</label>
+        <input id="spendingItem" placeholder="e.g. Onions">
+
+        <label for="spendingStore">Store</label>
+        <input id="spendingStore" placeholder="e.g. Pak'n Save">
+
+        <label for="spendingPrice">Total price ($)</label>
+        <input id="spendingPrice" type="number" min="0" step="0.01" placeholder="e.g. 3.60">
+
+        <label for="spendingWeight">Weight in kg (optional)</label>
+        <input id="spendingWeight" type="number" min="0" step="0.001" placeholder="e.g. 1.2">
+
+        <button class="primary" onclick="addTripSpendingEntry()">Add to Trip Spending</button>
+      </div>
+
+      <div id="spendingResults"></div>
+    </div>
+  `;
+
+  renderTripSpendingResults();
+}
+
+function addTripSpendingEntry(){
+  const item=document.getElementById("spendingItem").value.trim();
+  const store=document.getElementById("spendingStore").value.trim()||"Unspecified store";
+  const price=Number(document.getElementById("spendingPrice").value);
+  const weightValue=document.getElementById("spendingWeight").value;
+  const weight=weightValue===""?null:Number(weightValue);
+
+  if(!item){
+    alert("Please enter an item.");
+    return;
+  }
+
+  if(document.getElementById("spendingPrice").value===""||!Number.isFinite(price)||price<=0){
+    alert("Please enter a price greater than zero.");
+    return;
+  }
+
+  if(weight!==null&&(!Number.isFinite(weight)||weight<=0)){
+    alert("Please enter a weight greater than zero, or leave it blank.");
+    return;
+  }
+
+  tripSpendingEntries.push({item,store,price,weight});
+
+  renderTripSpendingResults();
+
+  document.getElementById("spendingItem").value="";
+  document.getElementById("spendingPrice").value="";
+  document.getElementById("spendingWeight").value="";
+  document.getElementById("spendingItem").focus();
+}
+
+function renderTripSpendingResults(){
+  const results=document.getElementById("spendingResults");
+  if(!results)return;
+
+  const total=tripSpendingEntries.reduce((sum,entry)=>sum+entry.price,0);
+  const stores=[...new Set(tripSpendingEntries.map(entry=>entry.store))];
+
+  results.innerHTML=`
+    <div class="section">
+      <h2>Trip Total: $${total.toFixed(2)}</h2>
+      ${stores.map(store=>{
+        const entries=tripSpendingEntries.filter(entry=>entry.store===store);
+        const storeTotal=entries.reduce((sum,entry)=>sum+entry.price,0);
+
+        return `
+          <div class="card">
+            <h3>${esc(store)} — $${storeTotal.toFixed(2)}</h3>
+            ${entries.map(entry=>`
+              <div class="bar">
+                <span>${esc(entry.item)} — $${entry.price.toFixed(2)}${entry.weight!==null?` (${entry.weight} kg, $${(entry.price/entry.weight).toFixed(2)}/kg)`:""}</span>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+  function shareShoppingList(){
   const items=state.items.filter(x=>x.selected&&!x.bought);
 
   if(!items.length){
@@ -1117,7 +1216,8 @@ async function resetBought(){
       selectedNames.add(item.id);
     }
 
-    state.routesByStore={};state.route=[];state.shopStarted=null;
+    tripSpendingEntries=[];
+state.routesByStore={};state.route=[];state.shopStarted=null;
     saveLocal();render();
     await syncMasterData();
     localDirty=false;
