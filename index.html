@@ -16,6 +16,12 @@ h1{font-size:20px;margin:0 0 10px}.tabs{display:flex;gap:6px}.tab{flex:1;border:
 main{max-width:760px;margin:auto;padding:12px 12px 100px}.bar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}.bar input{flex:1;min-width:180px;padding:12px;border:1px solid #d1d5db;border-radius:10px;font-size:16px}
 button{font:inherit}.primary{background:#111827;color:white;border:0;border-radius:10px;padding:12px 14px;font-weight:700}.secondary{background:white;border:1px solid #d1d5db;border-radius:10px;padding:10px 12px}
 .card{background:white;border-radius:14px;margin:8px 0;padding:12px;box-shadow:0 1px 4px #0001}.row{display:flex;align-items:center;gap:10px}.itemname{font-weight:700;flex:1}.cat{font-size:12px;color:#6b7280;margin-top:3px}
+
+#app .spending-form .spending-field{margin:0 0 14px}
+#app .spending-form label{display:block;font-weight:600;margin:0 0 6px}
+#app .spending-form input,#app .spending-form select{box-sizing:border-box;width:100%;min-height:44px;padding:10px;border:1px solid #d1d5db;border-radius:10px;font-size:16px;background:white}
+#app .spending-form .primary{width:100%;min-height:46px;margin-top:4px}
+
 .buy{width:42px;height:42px;border-radius:12px;border:2px solid #9ca3af;background:white;font-size:20px}.buy.done{background:#111827;color:white;border-color:#111827}.qty{display:flex;align-items:center;gap:5px}.qty-stepper{display:flex;align-items:center;gap:8px;margin:5px 0 8px}.qty-stepper button{min-width:46px;height:44px;font-size:24px;line-height:1}.qty-stepper input{width:80px!important;margin:0!important;text-align:center}.qty input{width:54px;text-align:center;padding:7px;border:1px solid #d1d5db;border-radius:8px}.qty-stepper{display:flex;align-items:center;justify-content:center;gap:10px;margin:6px 0}.qty-stepper button{min-width:48px;min-height:46px;font-size:24px;line-height:1}.qty-stepper input{flex:1;max-width:120px;text-align:center;padding:11px;border:1px solid #d1d5db;border-radius:10px;font-size:18px}.qty select{padding:7px;border:1px solid #d1d5db;border-radius:8px;background:white}
 .section{margin-top:18px}.section h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}.storetag{font-size:12px;color:#374151;margin-top:3px;font-weight:600}.item-open{border:0;background:transparent;padding:0;text-align:left;cursor:pointer;flex:1}.item-open:active{opacity:.7}
 .muted{color:#6b7280;font-size:13px}.empty{padding:30px;text-align:center;color:#6b7280}.stats{display:flex;gap:8px;margin-bottom:10px}.stat{background:white;border-radius:12px;padding:10px;flex:1;text-align:center}.stat b{display:block;font-size:20px}
@@ -664,30 +670,45 @@ function openTripSpending(itemId=null){
         <button class="secondary" onclick="renderShop(document.getElementById('app'))">Back to This Week</button>
       </div>
 
-      <div class="card">
-        <label for="spendingItem">Item</label>
+      <div class="card spending-form">
+        <div class="spending-field">
+  <label for="spendingItem">Item</label>
        <select id="spendingItem" onchange="updateTripSpendingItem()">
 ${spendingItems.map(x=>`<option value="${esc(String(x.id))}" ${(selectedItem?String(selectedItem.id)===String(x.id):String(spendingItems[0]?.id)===String(x.id))?"selected":""}>${esc(x.name)} — Qty: ${esc(x.shopQty||x.usualQty||1)} ${esc(x.shopUnit||x.usualUnit||"each")}</option>`).join("")}
 
 
-</select>
+</select></div>
 
-        <label for="spendingStore">Store</label>
-        <select id="spendingStore" onchange="updateTripSpendingItem()">
-  
-${[...new Set([...(state.stores||[]),...spendingItems.map(x=>x.shopStore||x.store||"Pak N Save"),"Pak N Save"])].map(store=>`<option value="${esc(store)}" ${(selectedItem?(selectedItem.shopStore||selectedItem.store||"Pak N Save"):spendingItems[0]?.shopStore||spendingItems[0]?.store||"Pak N Save")===store?"selected":""}>${esc(store)}</option>`).join("")}
+       
+        <div class="spending-field">
+          <label for="spendingStore">Store</label>
+          <select id="spendingStore" onchange="updateTripSpendingItem()">
+            ${[...new Set([...(state.stores||[]),...spendingItems.map(x=>x.shopStore||x.store||"Pak N Save"),"Pak N Save"])].map(store=>`<option value="${esc(store)}" ${(selectedItem?(selectedItem.shopStore||selectedItem.store||"Pak N Save"):spendingItems[0]?.shopStore||spendingItems[0]?.store||"Pak N Save")===store?"selected":""}>${esc(store)}</option>`).join("")}
+          </select>
+        </div>
 
-</select>
 
         
-<label for="spendingPrice">Price ($)</label>
-<input id="spendingPrice" type="number" min="0" step="0.01" placeholder="Confirmed shelf price">
 
-<label for="spendingQuantity">Quantity</label>
-<input id="spendingQuantity" type="number" min="1" step="1" value="${selectedItem?(selectedItem.shopQty||selectedItem.usualQty||1):(spendingItems[0]?.shopQty||spendingItems[0]?.usualQty||1)}">
+        <div class="spending-field">
+          <label for="spendingPrice">Price ($)</label>
+          <input id="spendingPrice" type="number" min="0" step="0.01" placeholder="Confirmed shelf price">
+        </div>
 
-<label for="spendingWeight">Weight in kg (for weighed items)</label>
-<input id="spendingWeight" type="number" min="0" step="0.001" placeholder="Leave blank if not weighed">
+
+
+        <div class="spending-field">
+          <label for="spendingQuantity">Quantity</label>
+          <input id="spendingQuantity" type="number" min="1" step="1" value="${selectedItem?(selectedItem.shopQty||selectedItem.usualQty||1):(spendingItems[0]?.shopQty||spendingItems[0]?.usualQty||1)}">
+        </div>
+
+
+
+        <div class="spending-field">
+          <label for="spendingWeight">Weight in kg (for weighed items)</label>
+          <input id="spendingWeight" type="number" min="0" step="0.001" placeholder="Leave blank if not weighed">
+        </div>
+
 
 
         <button class="primary" onclick="addTripSpendingEntry()">Add to Trip Spending</button>
