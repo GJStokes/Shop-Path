@@ -667,7 +667,9 @@ function openTripSpending(){
         <input id="spendingItem" placeholder="e.g. Onions">
 
         <label for="spendingStore">Store</label>
-        <input id="spendingStore" placeholder="e.g. Pak'n Save">
+        <select id="spendingStore">
+  ${DEFAULT_STORES.map(store=>`<option value="${esc(store)}">${esc(store)}</option>`).join("")}
+</select>
 
         <label for="spendingPrice">Total price ($)</label>
         <input id="spendingPrice" type="number" min="0" step="0.01" placeholder="e.g. 3.60">
