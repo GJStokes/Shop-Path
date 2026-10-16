@@ -1059,7 +1059,7 @@ function renderRoute(app){
 }
 
 function toggleSelect(id){const x=state.items.find(x=>x.id===id);if(!x)return;const wasSelected=!!x.selected;x.selected=!x.selected;x.bought=false;if(!wasSelected&&x.selected){x.shopStore=x.store||x.shopStore||"Pak N Save";}saveLocal();render();queueCloudSync()}
-function selectAll(v){state.items.forEach(x=>{if(!v)x.selected=false;x.bought=false});saveLocal();render();queueCloudSync()}
+function selectAll(v){state.items.forEach(x=>{if(!v)x.selected=false;x.bought=false});if(!v)tripSpendingEntries=[];saveLocal();render();queueCloudSync()}
 function removeFromWeek(id){
   const x=state.items.find(item=>item.id===id);
   if(!x)return;
