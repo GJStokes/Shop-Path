@@ -733,9 +733,9 @@ function addTripSpendingEntry(){
     return;
   }
 
-  if(quantityInput===""||!Number.isFinite(quantity)||quantity<1){
-    alert("Please enter a quantity of at least 1.");
-    return;
+  if(weightValue===""&&(quantityInput===""||!Number.isFinite(quantity)||quantity<1)){
+  alert("Please enter a quantity of at least 1.");
+  return;
   }
 
   if(weight!==null&&(!Number.isFinite(weight)||weight<=0)){
