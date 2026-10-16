@@ -667,7 +667,9 @@ function openTripSpending(itemId=null){
       <div class="card">
         <label for="spendingItem">Item</label>
        <select id="spendingItem" onchange="updateTripSpendingItem()">
-  ${spendingItems.map(x=><option value="${esc(String(x.id))}" ${(selectedItem?selectedItem.id===x.id:spendingItems[0]?.id===x.id)?"selected":""}>${esc(x.name)} — Qty: ${esc(x.shopQty||x.usualQty||1)} ${esc(x.shopUnit||x.usualUnit||"each")}</option>`).join("")}
+${spendingItems.map(x=>`<option value="${esc(String(x.id))}">${esc(x.name)} — Qty: ${esc(x.shopQty||x.usualQty||1)} ${esc(x.shopUnit||x.usualUnit||"each")}</option>`).join("")}
+
+
 </select>
 
         <label for="spendingStore">Store</label>
