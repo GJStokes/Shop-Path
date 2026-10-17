@@ -944,7 +944,8 @@ async function renderMaster(app){
 returnTopButton.textContent="↑ Return to Top";
 returnTopButton.className="master-return-top";
 returnTopButton.onclick=()=>{
-  masterScrollPosition=window.scrollY;
+  masterScrollReturnPosition=window.scrollY;
+masterScrollPosition=window.scrollY;
   masterPositionSaved=true;
 
   document.getElementById("search").scrollIntoView({
@@ -957,6 +958,7 @@ returnTopButton.onclick=()=>{
 app.appendChild(returnTopButton);
 
 let masterPositionSaved=false;
+let masterScrollReturnPosition=0;
 
 window.addEventListener("scroll",()=>{
   if(view==="master"&&window.scrollY>100&&!masterPositionSaved){
@@ -970,11 +972,10 @@ returnLastButton.className="master-return-top";
 returnLastButton.style.bottom="70px";
 returnLastButton.onclick=()=>{
   window.scrollTo({
-    top:masterScrollPosition,
+    top:masterScrollReturnPosition,
     behavior:"smooth"
   });
 
-  masterPositionSaved=false;
 };
 
 app.appendChild(returnLastButton);
