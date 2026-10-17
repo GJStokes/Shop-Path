@@ -944,13 +944,35 @@ async function renderMaster(app){
 returnTopButton.textContent="↑ Return to Top";
 returnTopButton.className="master-return-top";
 returnTopButton.onclick=()=>{
+  masterScrollPosition=window.scrollY;
+
   document.getElementById("search").scrollIntoView({
     behavior:"smooth",
     block:"start"
   });
-  document.getElementById("search").focus({preventScroll:true}); 
+
+  document.getElementById("search").focus({preventScroll:true});
 };
 app.appendChild(returnTopButton);
+
+window.addEventListener("scroll",()=>{
+  if(view==="master"&&window.scrollY>100){
+    masterScrollPosition=window.scrollY;
+  }
+});
+
+const returnLastButton=document.createElement("button");
+returnLastButton.textContent="↩ Return to Last Item";
+returnLastButton.className="master-return-top";
+returnLastButton.style.bottom="70px";
+returnLastButton.onclick=()=>{
+  window.scrollTo({
+    top:masterScrollPosition,
+    behavior:"smooth"
+  });
+};
+
+app.appendChild(returnLastButton);
 
   // Sort the existing item cards by how often each item was bought.
   // Uses the same household-oriented last-10 completed trips as New Trip.
