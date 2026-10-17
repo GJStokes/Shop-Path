@@ -28,6 +28,9 @@ button{font:inherit}.primary{background:#111827;color:white;border:0;border-radi
 .modal{position:fixed;inset:0;background:#0007;display:none;z-index:20;padding:18px}.modal.show{display:flex;align-items:flex-end}.sheet{background:white;border-radius:18px 18px 0 0;width:100%;max-height:85vh;overflow:auto;padding:16px}.sheet h2{margin-top:0}.sheet input,.sheet select{width:100%;padding:12px;margin:5px 0;border:1px solid #d1d5db;border-radius:10px;font-size:16px}.actions{display:flex;gap:8px;margin-top:10px}.actions button{flex:1}.field-group{margin:10px 0 14px}.field-label{display:block;margin:0 0 6px}.field-input{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:10px;font-size:16px}.store-list{margin:10px 0}.store-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #eee}.store-row span{flex:1;font-weight:600}.store-row button{padding:7px 10px}.store-add{display:flex;gap:8px;margin-top:12px}.store-add input{flex:1;margin:0}.store-add button{white-space:nowrap}.search-results{margin-top:18px}.search-results h2{font-size:15px;margin:0 4px 7px;text-transform:uppercase;letter-spacing:.05em;color:#4b5563}
 #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:#f3f4f6}.auth-card{width:min(100%,430px);background:white;border-radius:20px;padding:24px;box-shadow:0 10px 35px #0002}.auth-card h2{margin:0 0 6px}.auth-card input{width:100%;padding:13px;border:1px solid #d1d5db;border-radius:10px;font-size:16px;margin:6px 0}.auth-actions{display:flex;gap:8px;margin-top:10px}.auth-actions button{flex:1}.auth-msg{min-height:24px;margin-top:10px;font-size:14px;color:#b00020}.auth-links{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap}.auth-links button{border:0;background:none;padding:0;color:#2563eb;cursor:pointer}#app-shell{display:none}#app-shell.authenticated{display:block}#auth.hidden{display:none}.topline{display:flex;align-items:center;gap:8px;margin:0 0 8px;flex-wrap:wrap}.status{font-size:12px;color:#d1d5db}.user-pill{margin-left:auto;font-size:12px;color:#d1d5db}.notice{background:#fffbeb;border:1px solid #f59e0b;padding:12px;border-radius:12px;margin:10px 0;font-size:13px}
 @media(min-width:650px){.modal.show{align-items:center;justify-content:center}.sheet{max-width:520px;border-radius:18px}}
+
+.master-return-top{position:fixed;right:16px;bottom:20px;z-index:15;padding:12px 16px;border:0;border-radius:24px;background:#112827;color:white;font-weight:700;box-shadow:0 2px 8px #0003;cursor:pointer}
+
 </style>
 </head>
 <body>
@@ -937,6 +940,17 @@ async function renderMaster(app){
   `;
 
   document.getElementById("search").oninput=e=>filterCards(e.target.value);
+  const returnTopButton=document.createElement("button");
+returnTopButton.textContent="↑ Return to Top";
+returnTopButton.className="master-return-top";
+returnTopButton.onclick=()=>{
+  document.getElementById("search").scrollIntoView({
+    behavior:"smooth",
+    block:"start"
+  });
+  document.getElementById("search").focus({preventScroll:true}); 
+};
+app.appendChild(returnTopButton);
 
   // Sort the existing item cards by how often each item was bought.
   // Uses the same household-oriented last-10 completed trips as New Trip.
