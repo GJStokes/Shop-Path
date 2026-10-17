@@ -2048,7 +2048,7 @@ async function signOut(){await db.auth.signOut();currentUser=null;cloudReady=fal
 document.getElementById("signInBtn").onclick=()=>signIn();document.getElementById("signUpBtn").onclick=()=>signUp();document.getElementById("resetBtn").onclick=()=>resetPassword();document.getElementById("signOutBtn").onclick=()=>signOut();document.getElementById("syncNowBtn").onclick=()=>syncNow();
 ["authEmail","authPassword"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{if(e.key==="Enter")signIn()}));
 document.getElementById("tabShop").onclick=()=>{
-  if(view==="master")masterScrollPosition=window.scrollY;
+  if(view==="master"&&!masterPositionSaved)masterScrollPosition=window.scrollY;
   view="shop";
   setTabs();
   render();
