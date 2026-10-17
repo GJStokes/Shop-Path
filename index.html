@@ -945,6 +945,7 @@ returnTopButton.textContent="↑ Return to Top";
 returnTopButton.className="master-return-top";
 returnTopButton.onclick=()=>{
   masterScrollPosition=window.scrollY;
+  masterPositionSaved=true;
 
   document.getElementById("search").scrollIntoView({
     behavior:"smooth",
@@ -955,8 +956,10 @@ returnTopButton.onclick=()=>{
 };
 app.appendChild(returnTopButton);
 
+let masterPositionSaved=false;
+
 window.addEventListener("scroll",()=>{
-  if(view==="master"&&window.scrollY>100){
+  if(view==="master"&&window.scrollY>100&&!masterPositionSaved){
     masterScrollPosition=window.scrollY;
   }
 });
@@ -970,6 +973,8 @@ returnLastButton.onclick=()=>{
     top:masterScrollPosition,
     behavior:"smooth"
   });
+
+  masterPositionSaved=false;
 };
 
 app.appendChild(returnLastButton);
