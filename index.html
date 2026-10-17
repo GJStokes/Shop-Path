@@ -944,9 +944,8 @@ async function renderMaster(app){
 returnTopButton.textContent="↑ Return to Top";
 returnTopButton.className="master-return-top";
 returnTopButton.onclick=()=>{
-  masterScrollReturnPosition=window.scrollY;
-masterScrollPosition=window.scrollY;
-  masterPositionSaved=true;
+masterScrollReturnPosition=window.scrollY;
+masterPositionSaved=true;
 
   document.getElementById("search").scrollIntoView({
     behavior:"smooth",
@@ -974,7 +973,7 @@ returnLastButton.onclick=()=>{
   masterPositionSaved=false;
 
   window.scrollTo({
-    top:masterScrollPosition,
+    top:masterScrollReturnPosition,
     behavior:"smooth"
   });
 };
