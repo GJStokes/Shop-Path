@@ -971,11 +971,12 @@ returnLastButton.textContent="↩ Return to Last Item";
 returnLastButton.className="master-return-top";
 returnLastButton.style.bottom="70px";
 returnLastButton.onclick=()=>{
+  masterPositionSaved=false;
+
   window.scrollTo({
-    top:masterScrollReturnPosition,
+    top:masterScrollPosition,
     behavior:"smooth"
   });
-
 };
 
 app.appendChild(returnLastButton);
