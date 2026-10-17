@@ -87,6 +87,8 @@ let localDirty=false;
 let deviceLocalDataAvailable=false;
 let masterFrequency=new Map();
   let masterScrollPosition=0;
+  let masterPositionSaved=false;
+let masterScrollReturnPosition=0;
 let view="shop";
 
 function freshState(){
@@ -955,9 +957,6 @@ masterPositionSaved=true;
   document.getElementById("search").focus({preventScroll:true});
 };
 app.appendChild(returnTopButton);
-
-let masterPositionSaved=false;
-let masterScrollReturnPosition=0;
 
 window.addEventListener("scroll",()=>{
   if(view==="master"&&window.scrollY>100&&!masterPositionSaved){
