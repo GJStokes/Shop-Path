@@ -140,10 +140,9 @@ function migrateLegacyStoreNameInLocalState(){
   const canonical="Pak N Save";
   let changed=false;
   if(Array.isArray(state.stores)){
-    const hadCanonical=state.stores.some(st=>String(st).toLowerCase()===canonical.toLowerCase());
     const hadLegacy=state.stores.some(st=>String(st).toLowerCase()===legacy.toLowerCase());
     if(hadLegacy){
-      state.stores=state.stores.map(st=>String(st).toLowerCase()===legacy.toLowerCase()?(hadCanonical?canonical:canonical):st);
+      state.stores=state.stores.map(st=>String(st).toLowerCase()===legacy.toLowerCase()?canonical:st);
       state.stores=[...new Set(state.stores.map(String))];
       changed=true;
     }
