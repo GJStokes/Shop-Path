@@ -1579,7 +1579,6 @@ async function seedRemoteFromLocal(){
   // Write all local master data and route history. The caller only uses this when the
   // remote account is empty, so nothing existing in the cloud is overwritten.
   await syncMasterData();
-  await replaceCloudRoutes();
   await verifyCloudMatchesLocal();
   markMigrationCompleted(uid);
   localDirty=false;
@@ -2019,10 +2018,9 @@ async function syncNow(){
     // Never discard unsaved local changes. Push them first, then pull the
     // authoritative cloud state back down so both devices converge.
     if(localDirty){
-      await syncMasterData();
-      await replaceCloudRoutes();
-      localDirty=false;
-    }
+  await syncMasterData();
+  localDirty=false;
+}
     const remote=await fetchRemoteState();
     await downloadIntoLocal(remote);
     setCloudSnapshotSignature(currentUser.id,state);
