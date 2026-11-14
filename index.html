@@ -665,6 +665,7 @@ function renderShop(app){
 }
 
 let tripSpendingEntries=[];
+let editingTripSpendingIndex=null;
 
 function openTripSpending(itemId=null){
   const app=document.getElementById("app");
@@ -744,6 +745,7 @@ ${spendingItems.map(x=>`<option value="${esc(String(x.id))}" ${(selectedItem?Str
 }
 
 
+
 function addTripSpendingEntry(){
   const item=document.getElementById("spendingItem").value.trim();
   const store=document.getElementById("spendingStore").value.trim()||"Unspecified store";
@@ -765,8 +767,8 @@ function addTripSpendingEntry(){
   }
 
   if(weightValue===""&&(quantityInput===""||!Number.isFinite(quantity)||quantity<1)){
-  alert("Please enter a quantity of at least 1.");
-  return;
+    alert("Please enter a quantity of at least 1.");
+    return;
   }
 
   if(weight!==null&&(!Number.isFinite(weight)||weight<=0)){
@@ -776,14 +778,22 @@ function addTripSpendingEntry(){
 
   const totalPrice=weight!==null?price*weight:price*quantity;
 
-  tripSpendingEntries.push({
+  const entry={
     item,
     store,
     price:totalPrice,
     unitPrice:price,
     quantity,
     weight
-  });
+  };
+
+  if(editingTripSpendingIndex!==null){
+    tripSpendingEntries[editingTripSpendingIndex]=entry;
+    editingTripSpendingIndex=null;
+    document.querySelector(".spending-form .primary").textContent="Add to Trip Spending";
+  }else{
+    tripSpendingEntries.push(entry);
+  }
 
   renderTripSpendingResults();
 
@@ -794,6 +804,53 @@ function addTripSpendingEntry(){
   document.getElementById("spendingItem").focus();
 }
 
+function editTripSpendingEntry(index){
+  const entry=tripSpendingEntries[index];
+  if(!entry)return;
+
+  editingTripSpendingIndex=index;
+
+  const itemSelect=document.getElementById("spendingItem");
+  const existingOption=[...itemSelect.options].find(option=>option.value===entry.item);
+
+  if(!existingOption){
+    const option=document.createElement("option");
+    option.value=entry.item;
+    option.textContent=entry.item;
+    itemSelect.appendChild(option);
+  }
+
+  itemSelect.value=entry.item;
+  document.getElementById("spendingStore").value=entry.store;
+  document.getElementById("spendingPrice").value=entry.unitPrice;
+  document.getElementById("spendingQuantity").value=entry.quantity;
+  document.getElementById("spendingWeight").value=entry.weight??"";
+
+  document.querySelector(".spending-form .primary").textContent="Save Changes";
+
+  document.querySelector(".spending-form").scrollIntoView({
+    behavior:"smooth",
+    block:"start"
+  });
+}
+
+function deleteTripSpendingEntry(index){
+  const entry=tripSpendingEntries[index];
+  if(!entry)return;
+
+  if(!confirm(`Delete ${entry.item} from Trip Spending?`))return;
+
+  tripSpendingEntries.splice(index,1);
+
+  if(editingTripSpendingIndex===index){
+    editingTripSpendingIndex=null;
+    document.querySelector(".spending-form .primary").textContent="Add to Trip Spending";
+  }else if(editingTripSpendingIndex!==null&&editingTripSpendingIndex>index){
+    editingTripSpendingIndex--;
+  }
+
+  renderTripSpendingResults();
+}
 
 function renderTripSpendingResults(){
   const results=document.getElementById("spendingResults");
@@ -806,7 +863,10 @@ function renderTripSpendingResults(){
     <div class="section">
       <h2>Trip Total: $${total.toFixed(2)}</h2>
       ${stores.map(store=>{
-        const entries=tripSpendingEntries.filter(entry=>entry.store===store);
+        const entries=tripSpendingEntries
+          .map((entry,index)=>({...entry,index}))
+          .filter(entry=>entry.store===store);
+
         const storeTotal=entries.reduce((sum,entry)=>sum+entry.price,0);
 
         return `
@@ -814,10 +874,15 @@ function renderTripSpendingResults(){
             <h3>${esc(store)} — $${storeTotal.toFixed(2)}</h3>
             ${entries.map(entry=>`
               <div class="bar">
-                
-              
-              <span>${esc(entry.item)} — $${entry.price.toFixed(2)}${entry.weight!==null?` (${entry.weight} kg × $${(entry.price/entry.weight).toFixed(2)}/kg)`: ` (${entry.quantity} units × $${entry.unitPrice.toFixed(2)} each)`}</span>
-
+                <span>
+                  ${esc(entry.item)} — $${entry.price.toFixed(2)}
+                  ${entry.weight!==null
+                    ? ` (${entry.weight} kg × $${entry.unitPrice.toFixed(2)}/kg)`
+                    : ` (${entry.quantity} units × $${entry.unitPrice.toFixed(2)} each)`
+                  }
+                </span>
+                <button class="secondary" onclick="editTripSpendingEntry(${entry.index})">Edit</button>
+                <button class="secondary" onclick="deleteTripSpendingEntry(${entry.index})">Delete</button>
               </div>
             `).join("")}
           </div>
