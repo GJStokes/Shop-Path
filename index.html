@@ -686,6 +686,16 @@ app.innerHTML=`<div class="stats">
 let tripSpendingEntries=[];
 let editingTripSpendingIndex=null;
 
+let tripPriceMemory={};
+
+try{
+  tripPriceMemory=JSON.parse(
+    localStorage.getItem("shopPathTripPriceMemory")||"{}"
+  );
+}catch(e){
+  tripPriceMemory={};
+}
+
 function openTripSpending(itemId=null){
   const app=document.getElementById("app");
   const selectedItem=itemId?state.items.find(x=>x.id===itemId):null;
@@ -750,18 +760,24 @@ ${spendingItems.map(x=>`<option value="${esc(String(x.id))}" ${(selectedItem?Str
 
   renderTripSpendingResults();
 }
-  function updateTripSpendingItem(){
-  const item=state.items.find(
-  x=>String(x.id)===document.getElementById("spendingItem").value
-);
+  
+function updateTripSpendingItem(){
+  const itemId=document.getElementById("spendingItem").value;
+  const item=state.items.find(x=>String(x.id)===itemId);
   if(!item)return;
 
-  document.getElementById("spendingStore").value=
-    item.shopStore||item.store||"Pak N Save";
+  const store=document.getElementById("spendingStore").value;
 
   document.getElementById("spendingQuantity").value=
     item.shopQty||item.usualQty||1;
+
+  const key=JSON.stringify([itemId,store]);
+  const rememberedPrice=tripPriceMemory[key];
+
+  document.getElementById("spendingPrice").value=
+    rememberedPrice!==undefined?rememberedPrice:"";
 }
+
 
 
 
@@ -796,6 +812,13 @@ function addTripSpendingEntry(){
   }
 
   const totalPrice=weight!==null?price*weight:price*quantity;
+  const priceMemoryKey=JSON.stringify([item,store]);
+tripPriceMemory[priceMemoryKey]=price;
+
+localStorage.setItem(
+  "shopPathTripPriceMemory",
+  JSON.stringify(tripPriceMemory)
+);
 
   const entry={
     item,
