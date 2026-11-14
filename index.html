@@ -1283,10 +1283,15 @@ function toggleSelect(id){
 function selectAll(v){state.items.forEach(x=>{if(!v)x.selected=false;x.bought=false});if(!v)tripSpendingEntries=[];saveLocal();render();queueCloudSync()}
 function removeFromWeek(id){
   const x=state.items.find(item=>item.id===id);
-  if(!x)return;
+if(!x)return;
 
-  // Remove this item from the current week's shop.
-  x.selected=false;
+// Remove only this item's spending entry.
+tripSpendingEntries=tripSpendingEntries.filter(
+  entry=>String(entry.item)!==String(id)
+);
+
+// Remove this item from the current week's shop.
+x.selected=false;
   x.bought=false;
 
   // If there are no unbought items left, but there are bought items,
